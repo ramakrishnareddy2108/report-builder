@@ -74,3 +74,15 @@ export function toIsoDate(value: unknown): string | null {
 export function monthOfIso(iso: string): string {
   return iso.slice(0, 7);
 }
+
+/** The month before 'YYYY-MM' ("2026-01" -> "2025-12"). */
+export function previousMonth(month: string): string {
+  const [y = 0, m = 1] = month.split('-').map(Number);
+  return m === 1 ? `${pad(y - 1, 4)}-12` : `${pad(y, 4)}-${pad(m - 1)}`;
+}
+
+/** The month the reports are normally made for: the calendar month before today (in IST). */
+export function defaultReportMonth(today: Date = new Date()): string {
+  const parts = istDateParts(today);
+  return previousMonth(`${pad(parts?.year ?? 1970, 4)}-${pad(parts?.month ?? 1)}`);
+}

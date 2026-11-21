@@ -138,13 +138,11 @@ function checkEntry(path: string, bytes: Uint8Array): string | null {
         month?: unknown;
         runNumber?: unknown;
       };
-      if (info.area === 'run') {
-        if (data.month !== undefined && data.month !== info.month) {
-          return `${path} says month ${String(data.month)}, but it is in the ${info.month} folder.`;
-        }
-        if (data.runNumber !== undefined && data.runNumber !== info.runNumber) {
-          return `${path} says run ${String(data.runNumber)}, but it is in the run-${info.runNumber} folder.`;
-        }
+      if (info.area !== 'settings' && data.month !== undefined && data.month !== info.month) {
+        return `${path} says month ${String(data.month)}, but it is in the ${info.month} folder.`;
+      }
+      if (info.area === 'run' && data.runNumber !== undefined && data.runNumber !== info.runNumber) {
+        return `${path} says run ${String(data.runNumber)}, but it is in the run-${info.runNumber} folder.`;
       }
     } catch (err) {
       return (err as Error).message;

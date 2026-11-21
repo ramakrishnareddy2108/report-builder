@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { monthOfIso, parseDateText, toIsoDate } from '@/core/dates';
+import { defaultReportMonth, monthOfIso, parseDateText, previousMonth, toIsoDate } from '@/core/dates';
 
 describe('IST dates', () => {
   it('reads an Excel date at IST midnight as the IST day, not the UTC day', () => {
@@ -32,5 +32,18 @@ describe('IST dates', () => {
   });
   it('gives the month', () => {
     expect(monthOfIso('2026-10-12')).toBe('2026-10');
+  });
+});
+
+describe('months', () => {
+  it('finds the previous month, across a year end', () => {
+    expect(previousMonth('2026-11')).toBe('2026-10');
+    expect(previousMonth('2026-01')).toBe('2025-12');
+  });
+  it('defaults to the calendar month before today, in IST', () => {
+    expect(defaultReportMonth(new Date('2026-11-21T10:00:00Z'))).toBe('2026-10');
+    expect(defaultReportMonth(new Date('2026-01-05T10:00:00Z'))).toBe('2025-12');
+    // 30 Nov 20:00 UTC is already 1 Dec in India
+    expect(defaultReportMonth(new Date('2026-11-30T20:00:00Z'))).toBe('2026-11');
   });
 });

@@ -27,6 +27,9 @@ import { fsDirFromHandle, type FsDir } from './fs';
 // Paths
 // ---------------------------------------------------------------------------
 
+/** The costs being entered for a month (before a run saves its own copy). */
+export const COSTS_DRAFT_FILE = 'costs-draft.json';
+
 /** Suffix of the temp file written before a JSON file is replaced. */
 export const TEMP_SUFFIX = '.tmp';
 
@@ -92,6 +95,7 @@ export const paths = {
   drrTemplate: 'settings/templates/DRR Format.xlsx',
   sponsorTemplate: 'settings/templates/Sponsor-wise Revenue Report.xlsx',
   month: (month: string) => joinPath('data', month),
+  costsDraft: (month: string) => joinPath('data', month, COSTS_DRAFT_FILE),
   run: (month: string, runNumber: number) => joinPath('data', month, runDirName(runNumber)),
   outputMonth: (month: string) => joinPath('output', month),
 } as const;
@@ -130,6 +134,7 @@ const SETTINGS_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
 /** Where a JSON path sits in the layout; used to pick its schema. */
 export type JsonPathInfo =
   | { area: 'settings'; schema: z.ZodType }
+  | { area: 'month'; schema: z.ZodType; month: string }
   | { area: 'run'; schema: z.ZodType; month: string; runNumber: number };
 
 /** The schema for a known JSON file in the workspace, or null if the path is not one. */
@@ -138,6 +143,9 @@ export function describeJsonPath(path: string): JsonPathInfo | null {
   if (settingsSchema) return { area: 'settings', schema: settingsSchema };
 
   const parts = path.split('/');
+  if (parts.length === 3 && parts[0] === 'data' && parts[2] === COSTS_DRAFT_FILE && isMonthDirName(parts[1] ?? '')) {
+    return { area: 'month', schema: CostsFileSchema, month: parts[1] as string };
+  }
   if (parts.length !== 4 || parts[0] !== 'data') return null;
   const [, month = '', run = '', file = ''] = parts;
   const runNumber = parseRunDirName(run);

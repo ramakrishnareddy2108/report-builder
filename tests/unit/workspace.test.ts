@@ -77,6 +77,8 @@ describe('paths', () => {
     expect(describeJsonPath('data/2026-13/run-1/facts.json')).toBeNull();
     expect(describeJsonPath('data/2026-10/run-1/notes.json')).toBeNull();
     expect(describeJsonPath('data/2026-10/facts.json')).toBeNull();
+    expect(describeJsonPath('data/2026-10/costs-draft.json')).toMatchObject({ area: 'month', month: '2026-10' });
+    expect(describeJsonPath('data/2026-13/costs-draft.json')).toBeNull();
     expect(describeJsonPath('output/2026-10/run-1/facts.json')).toBeNull();
   });
 });
