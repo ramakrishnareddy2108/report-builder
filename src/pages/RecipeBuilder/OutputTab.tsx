@@ -13,6 +13,7 @@ import type { MappingStatus } from '@/excel/fillTemplate';
 import type { OutputDef, Recipe } from '@/recipe/schema';
 import { inspectTemplateInWorker } from '@/worker/client';
 import type { InspectTemplateResult } from '@/worker/tasks/inspectTemplate';
+import { templateProblem } from '../templateGuard';
 import { useBuilder } from './builderStore';
 
 type TemplateOutput = Extract<OutputDef, { mode: 'template' }>;
@@ -155,6 +156,11 @@ export function OutputTab() {
       return;
     }
     const base64 = bytesToBase64(new Uint8Array(await file.arrayBuffer()));
+    const problem = recipe ? await templateProblem(base64, recipe).catch(() => null) : null;
+    if (problem) {
+      toast.error(problem, { duration: 12000 });
+      return;
+    }
     if (file.size > TEMPLATE_WARN_BYTES) toast.warning(`This template is ${(file.size / 1024 / 1024).toFixed(1)} MB. Large templates make the recipe slow to save and share.`);
     patchTemplate((o) => {
       o.templateName = file.name;

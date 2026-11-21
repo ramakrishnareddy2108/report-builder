@@ -1,72 +1,81 @@
-# DRR Report Builder
+# Report Builder
 
-A small browser app for the finance team at G2 Health Care. Each month it turns the 8 Excel exports from the
-hospital system (HIS) into two reports:
+A small browser app that turns a set of **Excel exports** into a **finished Excel report**, using a saved
+**recipe**. Open the recipe, add the files, press **Generate**, read the checks, download.
 
-- **DRR**: the Doctor-wise Revenue Report
-- **Sponsor-wise Revenue Report**
+It started as the DRR (Doctor-wise Revenue Report) tool for the finance team at G2 Health Care, and is generic: the
+DRR and the Sponsor-wise report are just the two starter recipes. It also draws **dashboards** from finished reports,
+for example to compare three months.
 
-It checks the numbers, keeps every month for comparison, and fills your own Excel templates, so the formatting and
-formulas stay exactly as you made them.
+**Your data stays on your device.** Everything runs in the browser. Nothing is uploaded, there is no server and no
+login. Only recipes and dashboard layouts are saved (in this browser). The Excel files you add, and the names and
+amounts in them, live in memory until you close the page. Patient names, phone numbers and addresses cannot even be
+picked as columns.
 
-**Your files stay on your laptop.** Everything runs in the browser. Nothing is uploaded, there is no server and no
-login. The app never stores patient names, phone numbers or addresses.
+## It is an installable app (PWA)
 
-## You need
+Open the site once, then **Install app** (Chrome, Edge, Android) or **Share → Add to Home Screen** (iPhone). After the
+first visit it also works without internet. The layout adapts to phones: a tab bar at the bottom, large touch targets.
 
-- **Chrome or Edge** on a laptop or desktop. Other browsers (Firefox, Safari, phones) cannot save into a folder
-  and show a message asking you to switch.
-- The 8 monthly HIS exports, and the two report templates (`DRR Format.xlsx` and `Sponsor-wise Revenue Report.xlsx`).
+## How it works
 
-## First-time setup (once)
+| Page | What it is for |
+| --- | --- |
+| **Home** | Your recipes and dashboards: New, Edit, Generate, Duplicate, Delete. Export / Import library. |
+| **Recipe builder** | 1 Sources · 2 Prepare · 3 Report · 4 Output · 5 Test & Save. Set up once. |
+| **Generate** | Pick a recipe → add this month's files → check the month → Generate → checks → download. |
+| **Dashboards** | Tiles (numbers, charts, tables) over the last report or several saved reports. |
+| **Help** | A short how-to and the formula reference. |
 
-1. Open the app and go to **Workspace**. Choose (or create) a folder, for example `Documents\DRR Workspace`. Settings,
-   monthly data and reports are saved there. Pick a folder that is backed up.
-2. **Settings**: upload the two report templates. A file that does not fit is refused with a reason.
-3. **Sources**: drop the 8 Excel files. Each is recognised by its name and columns. Press **Set up** on each source,
-   check the columns, and **Confirm and save**. The suggested columns are right for the October 2026 exports.
-4. **Doctors**: press **Scan loaded files**, look at the suggested doctors, and **Add all** (or add them one by one).
-   Spellings like `Dr. A Kumar`, ` dr a kumar` and `A.KUMAR` are grouped as one doctor.
-5. **Costs**: enter the monthly costs for each doctor (see below).
+See [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for the guide for users, and [`CLAUDE.md`](CLAUDE.md) for the design and the
+rules the app follows. [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md) lists where the code adds to, or interprets, that design.
 
-## Every month
+## Backup and sharing
 
-1. **Run** page: drop this month's 8 exports. Each source should show **Ready**.
-2. **Costs** page: pick the month and enter Departmental Issues, Salary, Incentives and Professional Fee per doctor.
-   Use **Copy from** to start from last month, or **Import from Excel**. Type your name and **Save**.
-3. **Doctors** page: if a new doctor appeared, scan and add them. A name that is not in the list is never added
-   silently: it shows up in Checks.
-4. **Run** page: press **Run**. Look at **Doctor-wise**, **Sponsor-wise**, **Checks** and **Pharmacy attribution**.
-5. In **Checks**, a red **Fail** must be fixed (for example a file with the wrong columns, or a bill number that
-   appears twice). A yellow **Warning** needs a short note saying why it is acceptable.
-6. **Save Draft** as often as you like. When the checks are clear, **Mark Final**. A Final month cannot be changed.
-   To correct it later, load the files and run again; the new run needs a reason.
-7. **Download reports**: the two Excel files are saved in the workspace under `output\<month>\` and downloaded.
-
-## Backup and restore
-
-On the **Workspace** page, **Back up** downloads a zip of your settings and saved months (not the generated reports,
-which can be made again). Do this regularly and keep the zip somewhere safe. **Restore from backup** shows what will
-be replaced and asks you to confirm before it writes anything.
+Recipes and dashboards are stored in IndexedDB in the browser. **Export library** (on Home) saves them as one JSON file
+(`report-library-YYYYMMDD.json`); **Import library** reads it back, shows what is new and what would be overwritten,
+and lets you Merge (default) or Replace all. A badge, *Unsaved to file*, reminds you to export after changes.
 
 ## Never commit patient data
 
 The real exports are patient data. The folder `samples/` and every `.xlsx` outside `tests/fixtures/synthetic/` are
-git-ignored, and the test files in `tests/fixtures/synthetic/` are made-up. Do not paste real data into issues, chats
-or commits. See `CLAUDE.md` for the rules the app follows.
+git-ignored, and tests use made-up data built in memory. The app also refuses an Excel template that already holds
+names and amounts, because a template is saved inside the recipe.
 
 ## For developers
+
+Stack: React + TypeScript (strict) + Vite, Tailwind + shadcn/ui, Zustand, AG Grid, Apache ECharts, SheetJS, ExcelJS, Zod,
+idb-keyval, Vitest, a plain Web Worker. No server.
 
 ```bash
 npm ci            # install exactly what package-lock.json says
 npm run dev       # run locally
 npm run typecheck
 npm run test      # golden tests skip themselves when samples/ is missing
-npm run build     # production build in dist/
+npm run build     # production build in dist/ (includes the offline service worker)
 ```
 
-The brief and non-negotiable rules are in `CLAUDE.md`; the build steps are in `docs/BUILD_PROMPTS.md`.
-Synthetic test files are rewritten with `npx tsx scripts/make-fixtures.ts`.
+```text
+src/
+  app/        shell, stores (library, generate session, dashboards hand-off), PWA
+  pages/      Home, RecipeBuilder, Generate, Dashboards, Help
+  recipe/     schema (Zod), library (IndexedDB + import/export), validate, defaults/*.recipe.json
+  engine/     assignFiles, readSource, combine, cleanup, lookups, report, checks, output, generate  (pure)
+  formula/    the formula language (no eval)
+  excel/      readWorkbook, detectHeader, convert, fillTemplate, writePlain, escape
+  dashboard/  schema, data (load + stack), tiles (spec → numbers), chartOption
+  worker/     generate.worker.ts and its tasks
+tests/        unit, golden (real files in samples/, skipped when absent), fixtures/synthetic
+```
+
+The engine is pure functions with unit tests; React only edits recipe / dashboard JSON and shows results.
+Real-data checks: `npx vitest run tests/golden/drr.test.ts --silent=false` (needs `samples/2026-10/`).
+
+### The offline service worker
+
+`public/sw.js` is hand-written (no PWA library). At build time `scripts/precachePlugin.ts` writes the list of every file
+of the app into it, so the whole app is stored on the first visit. A new version waits until the user taps **Reload**.
+App icons are made by `node scripts/make-icons.mjs`. The starter recipes are made by `node scripts/make-default-recipes.mjs`.
 
 ### Publishing to GitHub Pages
 
@@ -79,4 +88,4 @@ The app is a set of static files. `.github/workflows/deploy.yml` builds and publ
    `github-pages` environment (normally `https://<user>.github.io/<repository>/`).
 
 A public repository is fine because the code holds no patient data. A private repository needs a paid GitHub plan
-for Pages.
+for Pages. Installing the app needs the site to be served over HTTPS, which GitHub Pages does.

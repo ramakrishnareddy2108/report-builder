@@ -47,6 +47,11 @@ export type TemplateInspection = {
   /** Last pre-made row of the table (rows that already hold numbers or formulas); firstDataRow - 1 when there are none. */
   lastTemplateRow: number;
   mapping: TemplateMappingEntry[];
+  /**
+   * Rows below the headings that already hold data (a name, an amount...) in columns the report fills. A template should
+   * be empty: a filled one would store that data inside the recipe.
+   */
+  filledRows: number;
 };
 
 export type FillResult = {
@@ -149,7 +154,15 @@ export function inspectTemplate(workbook: ExcelJS.Workbook, output: TemplateOutp
     const row = sheet.getRow(r);
     if (mappedCols.some((c) => !isEmpty(row.getCell(c)))) last = r;
   }
-  return { workbook, sheet, headerRow, firstDataRow, lastTemplateRow: last, mapping };
+  // Rows that already hold values in the columns the report fills (the S.No. column is pre-numbered in every template).
+  const isSerial = (name: string | null) => /^(s\.?\s*no\.?|serial|sr\.?\s*no\.?)$/i.test((name ?? '').trim());
+  const dataCols = mapping.flatMap((m) => (m.templateColumn === null || m.status === 'formula-kept' || isSerial(m.templateHeader) ? [] : [m.templateColumn]));
+  let filledRows = 0;
+  for (let r = firstDataRow; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+    if (dataCols.some((c) => !isEmpty(row.getCell(c)))) filledRows++;
+  }
+  return { workbook, sheet, headerRow, firstDataRow, lastTemplateRow: last, mapping, filledRows };
 }
 
 function copyRowStyle(sheet: ExcelJS.Worksheet, from: number, to: number, columns: number): void {

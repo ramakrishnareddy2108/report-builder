@@ -1,55 +1,87 @@
-# DRR Report Builder: user guide
+# User guide
 
-Each month this turns the 8 HIS Excel exports into the **DRR** and the **Sponsor-wise Revenue Report**, checks the
-numbers, and keeps every month. Use **Chrome or Edge**. Your files stay on your laptop: nothing is uploaded, and the app
-never stores patient names, phone numbers or addresses.
+For the finance team. No technical knowledge needed.
 
-## One-time setup (about 15 minutes)
+## The idea in one minute
 
-1. **Workspace**: choose a folder (for example `Documents\DRR Workspace`). Everything is saved there.
-2. **Settings**: upload the two templates, `DRR Format.xlsx` and `Sponsor-wise Revenue Report.xlsx`.
-3. **Sources**: drop in one month's 8 files. For each source press **Set up**, look at the columns, then **Confirm and save**.
-4. **Doctors**: press **Scan loaded files** and **Add all**. Different spellings of one doctor are grouped for you.
-   Names ending in “(REVIEW)” are kept apart: press **Same as …** if it is the same doctor.
+You do the setup **once**, for each kind of report. That setup is called a **recipe**. After that, every month is:
+
+> open the recipe → add the Excel files → **Generate** → read the checks → download
+
+Your Excel files are read on your own device. They are never uploaded and never saved. What is saved (in this browser)
+is only your recipes and your dashboard layouts.
+
+## First time: get the two starter recipes
+
+1. Open the app. On **Home**, press **Add starter recipes: DRR, Sponsor-wise**.
+2. Open **Generate** for the DRR. It asks for the Excel template (`DRR Format.xlsx`). Add it once. It is saved inside the
+   recipe, so you will not be asked again. Use the **empty** template: if it already has names and amounts, the app
+   refuses it, because they would be saved too.
+3. Do the same for the Sponsor-wise report (`Sponsor-wise Revenue Report.xlsx`).
 
 ## Every month
 
-| Step | Where | What to do |
-|---|---|---|
-| 1 | **Run** | Drop the 8 exports. Every source should say **Ready**. |
-| 2 | **Costs** | Pick the month. Enter Departmental Issues, Salary, Incentives and Professional Fee per doctor (or **Copy from** last month, or **Import from Excel**). Type your name, **Save**. |
-| 3 | **Doctors** | Only if a new doctor appears: **Scan loaded files**, then add them. |
-| 4 | **Run** | Press **Run**. Look through **Doctor-wise**, **Sponsor-wise**, **Checks** and **Pharmacy attribution**. |
-| 5 | **Run → Checks** | Fix every **Fail**. Write a short note on every **Warning** saying why it is fine. |
-| 6 | **Run** | **Save Draft** any time. When the checks are clear, **Mark Final**. |
-| 7 | **Run** | **Download reports**. Both Excel files are saved in the workspace under `output\<month>\`. |
+1. **Home → Generate** on the recipe.
+2. **Add this month's files.** Choose all the Excel exports at once. The app works out which file is which. The list shows
+   each file the recipe needs: a green tick, or *File missing*. If a file could be two things, choose what it is. A file
+   that matches nothing (for example one you do not need) is simply not used, and the checks tell you so.
+3. **Check the month**, for example *Oct-2026*. It starts as last month.
+4. Press **Generate**.
+5. **Read the checks.**
+   - **Red, "to fix"**: the report cannot be downloaded yet. For example *OP Billing: column NETAMOUNT not found*. Use
+     **Fix mapping**: it opens the recipe with your new file, so you can pick the new column.
+   - **Amber, "to check"**: it is made, but look. For example rows that could not be matched to a doctor, a number that
+     could not be read, or a total that does not match the one at the bottom of an export. Each one says how many rows, how
+     much money, and gives examples with the file and Excel row.
+   - **Details**: how many rows were read, left out (such as the totals row at the bottom) and used.
+6. **Download report.** The file is named `<Recipe>_<Month>.xlsx`. *Download combined data* gives every row behind the numbers.
+7. *Open in dashboard* shows the report as charts, without saving anything.
 
-## Reading the Checks
+## Make or change a recipe
 
-- **Fail (red)** blocks Final. Examples: a file with a renamed column, a bill number that appears twice, an amount that
-  cannot be read, a total that does not match. The message names the file and row.
-- **Warning (yellow)** needs your note. Examples: a doctor name that is not in the list, pharmacy sales with no matching
-  consultation, bills dated outside the month, a doctor whose revenue moved by more than 50%.
-- **Passed (green)** lists what was looked at. Nothing is hidden: every row that was not used is counted with its reason
-  under **Rows that were not used**.
+On **Home**, *New recipe* (or *Edit*). There are five steps.
 
-## When something looks wrong
+1. **Sources.** Add a sample file of each export. Each becomes a *source*. Tick the columns you need, give them a common
+   name (the same name in every file stacks together), and a type (Text, Number, Money, Date). Leave out the totals row at
+   the bottom with a *row filter*, for example `NOT(ISBLANK([BILLNO]))`. Press *Show combined data* to see all files stacked.
+2. **Prepare.** *Clean up names*: the same doctor written in different ways becomes one name; use **Join** for names it
+   cannot guess. *Look up missing values*: for example, pharmacy sales have no doctor, but the same patient's consultation
+   does. The result shows how many rows matched and how many did not.
+3. **Report.** Choose what each row stands for (for example Doctor, Department, Month), then the columns: row number,
+   group names, **Totals** (sum, count, average…, optionally only from some sources) and **Formulas** that use other
+   columns. A live preview is shown.
+4. **Output.** A plain Excel sheet, or your own template. For a template, the table shows which report column goes to which
+   heading, and which template formulas are kept.
+5. **Test & Save.** Run it on your sample files, read the checks, then **Save**. Changes are also saved as you work.
 
-- **A source says Flagged**: the file does not match its saved mapping (usually a renamed column). The message names the
-  column. Fix it on **Sources**; nothing is read from a flagged file.
-- **A name shows as “Unmatched doctor”**: add or merge it on **Doctors**, then run again.
-- **A month is Final but needs a correction**: load the files and run again. The new run needs a reason; the Final run is
-  kept untouched.
-- **Numbers look different from last month**: open **Months → Compare** to see the change per doctor.
+The recipe is not finished until the list at the top of *Test & Save* is empty. A recipe that is not finished says so on Home.
 
-## Looking back
+## Dashboards
 
-**Months** lists every saved month with its totals, and can download its reports again. **Compare** puts two months side by
-side; **Trend** draws the last 12 months. **Dashboards** has ready-made views (start with *Monthly Review*) and lets you
-build your own tiles.
+1. **Dashboards → Add "DRR Monthly Review"** (or *New dashboard*).
+2. **Data:** *Use the last generated report*, or *Upload saved report files*. To compare months, upload several (for
+   example three months of DRR). A totals row in a saved report is skipped. A file with no *Month* column uses its file name.
+3. **Filters** at the top (tap to pick several). **Tiles** show a number, chart or table. The ⋮ menu on a tile lets you edit,
+   move, delete, and download a picture (PNG) or the numbers (Excel).
+4. **Save** keeps the layout, not the data.
 
-## Look after your data
+## Back up and share
 
-- **Workspace → Back up** every month and keep the zip somewhere safe. **Restore from backup** asks before it writes.
-- Never put the real exports in email, chat or a public place. They are patient data.
-- Do not edit files inside the workspace folder by hand.
+Recipes and dashboards live in this browser only. On **Home**, **Export library** saves them to one file. Do it now and
+then (the amber *Unsaved to file* badge reminds you), and keep the file safe. To share with a colleague, send the file;
+they choose **Import library**, see what is new and what would be overwritten, and confirm.
+
+## On a phone
+
+Open the site, then *Install app* (Android) or *Share → Add to Home Screen* (iPhone). It works like an app, and after the
+first visit also without internet.
+
+## If something looks wrong
+
+| You see | What it means |
+| --- | --- |
+| *column X not found* | The export changed. Use **Fix mapping** and pick the new column. |
+| *rows could not be matched* | A lookup found no record for those rows. They are listed, with their amount. They stay in the report under the *not found* name you chose. |
+| *unreadable* values | A cell in a number or date column was not a valid number or date. It is counted as blank, and listed. |
+| *Tie-out* difference | A total at the bottom of an export does not equal the same figure in the report. Look at the filters and the sources. |
+| *Files not used* | You added a file that no source of the recipe uses. Fine if it is not needed. |

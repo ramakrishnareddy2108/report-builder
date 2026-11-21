@@ -15,6 +15,7 @@ import { bytesToBase64 } from '@/lib/base64';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { Recipe } from '@/recipe/schema';
+import { templateProblem } from '../templateGuard';
 import { NOT_USED, type SourceSlot } from './assignments';
 import { ResultView } from './ResultView';
 
@@ -69,6 +70,11 @@ function TemplateNeeded({ recipe }: { recipe: Recipe }) {
       return;
     }
     const base64 = bytesToBase64(new Uint8Array(await file.arrayBuffer()));
+    const problem = await templateProblem(base64, recipe).catch(() => null);
+    if (problem) {
+      toast.error(problem, { duration: 12000 });
+      return;
+    }
     await useLibrary.getState().saveRecipe({ ...recipe, output: { ...recipe.output, templateName: file.name, templateBase64: base64 } });
     toast.success(`${file.name} is saved in this recipe. You will not need to add it again.`);
   }

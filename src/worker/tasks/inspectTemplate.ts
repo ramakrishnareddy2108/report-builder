@@ -12,7 +12,7 @@ export type InspectTemplateRequest = {
 };
 
 export type InspectTemplateResult =
-  | { ok: true; sheets: string[]; sheet: string; headerRow: number; firstDataRow: number; lastTemplateRow: number; mapping: TemplateMappingEntry[] }
+  | { ok: true; sheets: string[]; sheet: string; headerRow: number; firstDataRow: number; lastTemplateRow: number; mapping: TemplateMappingEntry[]; filledRows: number }
   | { ok: false; sheets: string[]; message: string };
 
 export async function inspectTemplateTask(req: InspectTemplateRequest): Promise<InspectTemplateResult> {
@@ -25,7 +25,7 @@ export async function inspectTemplateTask(req: InspectTemplateRequest): Promise<
   const sheets = workbook.worksheets.map((s) => s.name);
   try {
     const t = inspectTemplate(workbook, req.output, req.reportColumns);
-    return { ok: true, sheets, sheet: t.sheet.name, headerRow: t.headerRow, firstDataRow: t.firstDataRow, lastTemplateRow: t.lastTemplateRow, mapping: t.mapping };
+    return { ok: true, sheets, sheet: t.sheet.name, headerRow: t.headerRow, firstDataRow: t.firstDataRow, lastTemplateRow: t.lastTemplateRow, mapping: t.mapping, filledRows: t.filledRows };
   } catch (err) {
     if (err instanceof TemplateError) return { ok: false, sheets, message: err.message };
     throw err;
