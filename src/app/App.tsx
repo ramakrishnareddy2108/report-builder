@@ -6,6 +6,7 @@ import { PAGE_COMPONENTS } from '@/pages';
 import { BottomNav } from './BottomNav';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Header } from './Header';
+import { useLibrary } from './libraryStore';
 import { Sidebar } from './Sidebar';
 import { UpdateBanner } from './UpdateBanner';
 import { listenToHash, useAppStore } from './store';
@@ -13,6 +14,7 @@ import { listenToHash, useAppStore } from './store';
 export function App() {
   const page = useAppStore((s) => s.route.page);
   useEffect(() => listenToHash(), []);
+  useEffect(() => void useLibrary.getState().load(), []);
 
   const Page = PAGE_COMPONENTS[page];
 
