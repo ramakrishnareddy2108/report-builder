@@ -2,17 +2,18 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { countByLevel, finalBlockers, runChecks, withNotes, type CheckInput } from '@/core/checks';
 import { RulesFileSchema } from '@/core/schemas';
 import type { RunOutput } from '@/core/runMonth';
-import type { CheckResult, FactRow } from '@/core/types';
+import type { CheckResult, CostEntry, FactRow } from '@/core/types';
 import { runMonthTask } from '@/worker/tasks/runMonth';
 import { DR_A, DOCTORS, MONTH, monthRequest, monthSettings } from '../helpers/monthFixture';
 
+const SOME_COSTS: CostEntry[] = [{ doctorId: DR_A, amounts: { SALARY: 500000 } }];
 let run: RunOutput;
 beforeAll(async () => {
   run = await runMonthTask(monthRequest());
 });
 
 function input(over: Partial<CheckInput> = {}, diag = run.diagnostics): CheckInput {
-  return { month: MONTH, rules: monthSettings().rules, doctors: DOCTORS, diagnostics: diag, facts: run.facts, previous: null, ...over };
+  return { month: MONTH, rules: monthSettings().rules, doctors: DOCTORS, diagnostics: diag, facts: run.facts, costs: SOME_COSTS, previous: null, ...over };
 }
 const find = (checks: CheckResult[], id: string): CheckResult => {
   const c = checks.find((x) => x.id === id);
@@ -36,6 +37,8 @@ describe('the made-up month', () => {
       'source-totals': 'Pass',
       'report-ties-to-sources': 'Pass',
       'unknown-doctors': 'Warning', // "Dr Unknown"
+      'costs-entered': 'Pass',
+      'costs-unknown-doctors': 'Pass',
       'pharmacy-attribution': 'Warning', // 2 Fallback + 1 Unattributed
       'op-overlap': 'Pass', // consultations are not added to OP revenue
       'dates-outside-month': 'Warning', // G4 is dated in November
@@ -167,6 +170,14 @@ describe('Fail checks', () => {
 });
 
 describe('Warning checks', () => {
+  it('warns when no costs were entered, and when costs belong to doctors who left the list', () => {
+    expect(find(runChecks(input({ costs: [] })), 'costs-entered')).toMatchObject({ level: 'Warning' });
+    expect(find(runChecks(input({ costs: [{ doctorId: DR_A, amounts: {} }] })), 'costs-entered').level).toBe('Warning'); // a note alone is not a cost
+    expect(find(runChecks(input({ costs: [{ doctorId: DR_A, amounts: { SALARY: 0 } }] })), 'costs-entered').level).toBe('Pass'); // an entered 0 counts
+    const orphan = find(runChecks(input({ costs: [{ doctorId: 'gone', amounts: { SALARY: 100 } }] })), 'costs-unknown-doctors');
+    expect(orphan).toMatchObject({ level: 'Warning', rows: 1, details: ['gone'] });
+  });
+
   it('overlap of OP Billing and Consultations only warns when consultations are added to OP revenue', () => {
     const on = monthSettings({ flags: { includeConsultations: true } }).rules;
     expect(find(runChecks(input({ rules: on })), 'op-overlap')).toMatchObject({ level: 'Warning', rows: 2 });
@@ -250,7 +261,7 @@ describe('making a run Final', () => {
   });
 
   it('counts checks by level', () => {
-    expect(countByLevel(checks())).toEqual({ Pass: 13, Warning: 3, Fail: 1 });
+    expect(countByLevel(checks())).toEqual({ Pass: 15, Warning: 3, Fail: 1 });
   });
 });
 

@@ -27,6 +27,7 @@ export function orphanEntries(doctors: readonly DoctorMaster[], entries: readonl
   return entries.filter((e) => !known.has(e.doctorId));
 }
 
+/** True when any cost amount is entered (an entered 0 counts). */
 export function hasAmounts(amounts: CostAmounts): boolean {
   return COST_MEASURE_CODES.some((c) => amounts[c] !== undefined);
 }

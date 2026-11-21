@@ -86,3 +86,11 @@ export function defaultReportMonth(today: Date = new Date()): string {
   const parts = istDateParts(today);
   return previousMonth(`${pad(parts?.year ?? 1970, 4)}-${pad(parts?.month ?? 1)}`);
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "2026-10" -> "Oct-2026". */
+export function monthLabel(month: string): string {
+  const [y = '', m = ''] = month.split('-');
+  return `${MONTH_NAMES[Number(m) - 1] ?? m}-${y}`;
+}

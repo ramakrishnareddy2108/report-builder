@@ -155,6 +155,15 @@ function opOverlap(billing: MappedSheet | undefined, consultations: MappedSheet 
   return { pairs: both.size, examples: [...both].slice(0, 5) };
 }
 
+/** Files with identical bytes (same SHA-256). Empty hashes (files that were not read) never match. */
+export function findDuplicateFiles(files: readonly { sourceId: SourceId; fileName: string; sha256: string }[]): RunDiagnostics['duplicateFiles'] {
+  const byHash = new Map<string, typeof files[number][]>();
+  for (const f of files) if (f.sha256 !== '') byHash.set(f.sha256, [...(byHash.get(f.sha256) ?? []), f]);
+  return [...byHash.entries()]
+    .filter(([, list]) => list.length > 1)
+    .map(([sha256, list]) => ({ sha256, fileNames: list.map((f) => f.fileName), sourceIds: list.map((f) => f.sourceId) }));
+}
+
 export function buildRun({ month, settings, read }: BuildRunInput): RunOutput {
   const readBySource = new Map(read.map((r) => [r.sourceId, r]));
   const sources = new Map<SourceId, SourceRows>();
@@ -186,8 +195,6 @@ export function buildRun({ month, settings, read }: BuildRunInput): RunOutput {
   });
 
   const fingerprints: FileFingerprint[] = read.map(({ sourceId, fileName, sizeBytes, sha256 }) => ({ sourceId, fileName, sizeBytes, sha256 }));
-  const byHash = new Map<string, FileFingerprint[]>();
-  for (const f of fingerprints) byHash.set(f.sha256, [...(byHash.get(f.sha256) ?? []), f]);
 
   return {
     month,
@@ -197,9 +204,7 @@ export function buildRun({ month, settings, read }: BuildRunInput): RunOutput {
       sources: diag,
       terms: out.terms,
       unmatchedDoctors: out.unmatchedDoctors,
-      duplicateFiles: [...byHash.entries()]
-        .filter(([, list]) => list.length > 1)
-        .map(([sha256, list]) => ({ sha256, fileNames: list.map((f) => f.fileName), sourceIds: list.map((f) => f.sourceId) })),
+      duplicateFiles: findDuplicateFiles(fingerprints),
       opOverlap: opOverlap(sources.get('opBilling')?.mapped, sources.get(ATTRIBUTION_SOURCE_ID)?.mapped),
       ruleProblems: out.ruleProblems,
       fingerprints,

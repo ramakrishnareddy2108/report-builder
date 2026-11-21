@@ -8,7 +8,8 @@ import { pivot, sumFacts, totalValues } from './aggregate';
 import { formatINR } from './money';
 import type { RulesFile } from './schemas';
 import type { RunDiagnostics, RowExample, SourceDiag, TermStat } from './runTypes';
-import { SOURCE_LABELS, type CheckLevel, type CheckResult, type DoctorMaster, type FactRow, type MeasureCode, type SourceId } from './types';
+import { hasAmounts, orphanEntries } from './costs';
+import { SOURCE_LABELS, type CheckLevel, type CheckResult, type CostEntry, type DoctorMaster, type FactRow, type MeasureCode, type SourceId } from './types';
 import { SKIP_REASON_LABELS, type SkipReason } from '@/excel/mapSource';
 import { plural } from '@/lib/plural';
 
@@ -24,6 +25,8 @@ export type CheckInput = {
   doctors: readonly DoctorMaster[];
   diagnostics: RunDiagnostics;
   facts: readonly FactRow[];
+  /** The month's costs as entered (empty when none). */
+  costs: readonly CostEntry[];
   previous: PreviousMonth | null;
   /** Other loaded files identical to a used one (found on the Run page). */
   duplicateLoadedFiles?: RunDiagnostics['duplicateFiles'];
@@ -231,6 +234,31 @@ function unknownDoctors(d: RunDiagnostics): CheckResult {
   );
 }
 
+function costsEntered(input: CheckInput): CheckResult {
+  const entered = input.costs.some((c) => hasAmounts(c.amounts));
+  return judge(
+    'costs-entered',
+    'Monthly costs are entered',
+    !entered,
+    'Warning',
+    `Costs are entered for ${plural(input.costs.filter((c) => hasAmounts(c.amounts)).length, 'doctor')}.`,
+    `No costs were entered for ${input.month}, so Departmental Issues, Salary, Incentives and Professional Fee are all 0 and Gross Profit is overstated. Enter them on the Costs page.`,
+  );
+}
+
+function costsForUnknownDoctors(input: CheckInput): CheckResult {
+  const orphans = orphanEntries(input.doctors, input.costs).filter((c) => hasAmounts(c.amounts));
+  return judge(
+    'costs-unknown-doctors',
+    'Costs belong to doctors in the list',
+    orphans.length > 0,
+    'Warning',
+    'Every cost entry belongs to a doctor in the doctor list.',
+    `${plural(orphans.length, 'cost entry', 'cost entries')} belong${orphans.length === 1 ? 's' : ''} to doctors who are not in the doctor list, so ${orphans.length === 1 ? 'it is' : 'they are'} left out of the report.`,
+    { rows: orphans.length, details: orphans.map((c) => c.doctorId) },
+  );
+}
+
 function pharmacyAttribution(facts: readonly FactRow[]): CheckResult {
   // OP_PHARMACY only, so a row is not counted again for its cost.
   const rows = facts.filter((f) => f.measure === 'OP_PHARMACY' && f.attributionStatus !== undefined);
@@ -429,6 +457,8 @@ export function runChecks(input: CheckInput): CheckResult[] {
     sourceTotals(d),
     reportTies(d, input.facts),
     unknownDoctors(d),
+    costsEntered(input),
+    costsForUnknownDoctors(input),
     pharmacyAttribution(input.facts),
     opOverlap(d, input.rules),
     datesOutsideMonth(d),
