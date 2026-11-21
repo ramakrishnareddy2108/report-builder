@@ -438,7 +438,10 @@ export async function pickWorkspaceFolder(): Promise<FileSystemDirectoryHandle |
   try {
     return await window.showDirectoryPicker({ id: 'drr-workspace', mode: 'readwrite' });
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') return null;
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      console.warn('Folder picker returned AbortError:', err.message);
+      return null;
+    }
     throw err;
   }
 }

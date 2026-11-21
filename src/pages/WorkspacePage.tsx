@@ -27,9 +27,25 @@ function isPermissionError(err: unknown): boolean {
 
 async function choose() {
   try {
-    await chooseWorkspace();
-  } catch {
-    toast.error('Could not open that folder. Please try again or choose a different folder.');
+    toast.info('Opening the folder picker… if no window appears, check the taskbar or behind this window.');
+    const picked = await chooseWorkspace();
+    if (picked) {
+      toast.success('Workspace folder connected.');
+    } else {
+      toast.warning(
+        'No folder was selected. If you did pick one, Chrome may have refused it (Documents, Desktop, Downloads and drive roots are blocked). Create a new folder such as D:\\DRR-Workspace and choose that.',
+        { duration: 15000 },
+      );
+    }
+  } catch (err) {
+    console.error('Choosing the workspace folder failed', err);
+    const name = err instanceof DOMException || err instanceof Error ? err.name : 'Error';
+    const detail = err instanceof Error ? err.message : String(err);
+    const hint =
+      name === 'SecurityError' || name === 'NotAllowedError'
+        ? ' Chrome blocks folders like Documents, Desktop, Downloads and drive roots — create a new folder (for example D:\\DRR-Workspace) and choose that.'
+        : '';
+    toast.error(`Could not open that folder (${name}: ${detail}).${hint}`, { duration: 15000 });
   }
 }
 
