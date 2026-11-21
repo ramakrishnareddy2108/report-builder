@@ -19,3 +19,6 @@ Thumbs.db
 
 # Derived from real samples
 docs/source-profile.md
+
+# Local settings for the golden tests (may name real doctors)
+tests/golden/settings.local.json

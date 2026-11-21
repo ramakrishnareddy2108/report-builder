@@ -11,7 +11,7 @@ import { MEASURES } from '@/core/measures';
 
 describe.skipIf(!samplesPresent)('October 2026 pipeline on the real exports', () => {
   it('runs end to end with every doctor accepted as suggested', { timeout: 180_000 }, async () => {
-    const { run, settings } = await runOctober();
+    const { run, settings, costs } = await runOctober();
     const d = run.diagnostics;
 
     for (const s of d.sources.filter((x) => x.needed)) {
@@ -35,7 +35,7 @@ describe.skipIf(!samplesPresent)('October 2026 pipeline on the real exports', ()
     console.info(`unmatched doctors ${d.unmatchedDoctors.length}, duplicate refs ` + JSON.stringify(d.sources.map((s) => [s.sourceId, s.duplicateRefs.rows]).filter(([, n]) => n)));
     console.info(`op overlap pairs ${d.opOverlap.pairs}; unreadable cells ` + JSON.stringify(d.sources.map((s) => [s.sourceId, s.unreadableUnused.count]).filter(([, n]) => n)));
 
-    const checks = runChecks({ month: '2026-10', rules: settings.rules, doctors: settings.doctors.doctors, diagnostics: d, facts: run.facts, costs: [], previous: null });
+    const checks = runChecks({ month: '2026-10', rules: settings.rules, doctors: settings.doctors.doctors, diagnostics: d, facts: run.facts, costs, previous: null });
     for (const c of checks.filter((x) => x.level !== 'Pass')) console.info(`CHECK ${c.level}: ${c.title} - ${c.message.slice(0, 200)}`);
 
     expect(d.ruleProblems).toEqual([]);

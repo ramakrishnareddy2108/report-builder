@@ -21,9 +21,9 @@ const sheet = async (bytes: Uint8Array) => {
 
 describe.skipIf(!have)('real templates with the real October numbers', () => {
   it('pass the self-check, fill, and keep their shared formulas', { timeout: 180_000 }, async () => {
-    const { run, settings } = await runOctober();
+    const { run, settings, costs } = await runOctober();
     const doctors = settings.doctors.doctors;
-    const drrRows = doctorReport(run.facts, [], doctors, '2026-10');
+    const drrRows = doctorReport(run.facts, costs, doctors, '2026-10');
     const sponsorRows = sponsorReport(run.facts, '2026-10');
     const names = new Map(doctors.map((d) => [d.id, d.displayName]));
 
