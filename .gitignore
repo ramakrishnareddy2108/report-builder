@@ -1,0 +1,4 @@
+samples/
+*.xlsx
+!tests/fixtures/synthetic/*.xlsx
+!tests/fixtures/synthetic/**/*.xlsx
