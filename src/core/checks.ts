@@ -30,6 +30,8 @@ export type CheckInput = {
   previous: PreviousMonth | null;
   /** Other loaded files identical to a used one (found on the Run page). */
   duplicateLoadedFiles?: RunDiagnostics['duplicateFiles'];
+  /** The template self-checks (made in the worker, where the workbooks are read). */
+  templateChecks?: readonly CheckResult[];
 };
 
 const label = (id: SourceId) => SOURCE_LABELS[id];
@@ -456,6 +458,7 @@ export function runChecks(input: CheckInput): CheckResult[] {
     duplicateRefs(d),
     sourceTotals(d),
     reportTies(d, input.facts),
+    ...(input.templateChecks ?? []),
     unknownDoctors(d),
     costsEntered(input),
     costsForUnknownDoctors(input),

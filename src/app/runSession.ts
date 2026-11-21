@@ -15,9 +15,13 @@ import {
 import type { CheckResult, CostEntry, FactRow, FileFingerprint, RunStatus } from '@/core/types';
 import { SOURCE_IDS } from '@/core/types';
 import { readCostsDraft } from '@/storage/costs';
+import { doctorReport, sponsorReport } from '@/core/report';
+import { downloadFile } from '@/storage/backup';
 import { findPreviousFinal, finalizeRun, listRuns, readRun, writeRun, type RunSummary } from '@/storage/runs';
-import type { Workspace } from '@/storage/workspace';
-import { runMonthInWorker } from '@/worker/client';
+import { readTemplate } from '@/storage/templates';
+import { joinPath, paths, type Workspace } from '@/storage/workspace';
+import { buildReportsInWorker, checkTemplatesInWorker, runMonthInWorker } from '@/worker/client';
+import type { BuildReportsResult } from '@/worker/tasks/reports';
 import type { TaskProgress } from '@/worker/protocol';
 import { fileForSource, useFiles } from './filesStore';
 import { useSettings } from './settingsStore';
@@ -50,7 +54,7 @@ type RunState = {
   savedRuns: RunSummary[];
   /** Costs entered for the month (null while loading). */
   costsEntered: boolean | null;
-  busy: 'saving' | 'finalizing' | null;
+  busy: 'saving' | 'finalizing' | 'reports' | null;
 };
 
 export const useRun = create<RunState>()(() => ({
@@ -122,6 +126,13 @@ export async function startRun(ws: Workspace): Promise<void> {
       loaded.flatMap((f) => (f.state === 'ready' && f.sourceId && f.sha256 ? [{ sourceId: f.sourceId, fileName: f.file.name, sha256: f.sha256 }] : [])),
     );
     const costs = costsFile?.entries ?? [];
+    // The templates' own formulas must give the same numbers as the report (checked in the worker).
+    const templateChecks = await checkTemplatesInWorker({
+      drr: await readTemplate(ws, 'drr'),
+      sponsor: await readTemplate(ws, 'sponsor'),
+      drrRows: doctorReport(output.facts, costs, run.doctors.doctors, month),
+      sponsorRows: sponsorReport(output.facts, month),
+    });
     const checks = runChecks({
       month,
       rules: run.rules,
@@ -131,6 +142,7 @@ export async function startRun(ws: Workspace): Promise<void> {
       costs,
       previous,
       duplicateLoadedFiles,
+      templateChecks,
     });
     set({
       status: 'ready',
@@ -256,5 +268,42 @@ export async function markFinal(ws: Workspace, options: SaveOptions): Promise<nu
     return runNumber;
   } finally {
     set({ busy: null });
+  }
+}
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/**
+ * Make the two Excel reports for the saved run, keep a copy in output/<month>/, and offer them for download.
+ * The run must be saved first, so every report can be traced to a run (and its settings).
+ */
+export async function downloadReports(ws: Workspace): Promise<BuildReportsResult> {
+  const { result, notes } = get();
+  if (!result) throw new Error('There is no run to make reports from yet.');
+  if (!result.saved) throw new Error('Save the run first (Save Draft), so the reports can be traced to a saved run.');
+
+  set({ busy: 'reports', progress: { stage: 'Making the reports', fraction: 0 } });
+  try {
+    const built = await buildReportsInWorker(
+      {
+        month: result.month,
+        runNumber: result.saved.runNumber,
+        drr: await readTemplate(ws, 'drr'),
+        sponsor: await readTemplate(ws, 'sponsor'),
+        drrRows: doctorReport(result.facts, result.costs, result.settings.doctors.doctors, result.month),
+        sponsorRows: sponsorReport(result.facts, result.month),
+        checks: checksWithNotes(result, notes),
+        facts: result.facts,
+        doctorNames: result.settings.doctors.doctors.map((d) => [d.id, d.displayName]),
+      },
+      (progress) => set({ progress }),
+    );
+    for (const file of built.files) {
+      await ws.writeFile(joinPath(paths.outputMonth(result.month), file.fileName), file.bytes);
+      downloadFile(file.bytes, file.fileName, XLSX_MIME);
+    }
+    return built;
+  } finally {
+    set({ busy: null, progress: null });
   }
 }

@@ -1,56 +1,17 @@
 // Full pipeline on the real October 2026 exports (git-ignored). Skipped without samples/.
 // Prints counts and totals only, never names or cell values.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { DoctorMatcher } from '@/core/doctors';
+import { runOctober, samplesPresent } from '../helpers/realOctober';
 import { pivot, totalValues } from '@/core/aggregate';
 import { runChecks } from '@/core/checks';
 import { formatINR } from '@/core/money';
 import { MEASURES } from '@/core/measures';
-import { DEFAULT_SOURCE_MAPPINGS } from '@/core/sourceDefaults';
-import { loadDefaultRules } from '@/core/defaults';
-import { DoctorMatcher, NameCounter, acceptSuggestions, suggestDoctors } from '@/core/doctors';
-import { readFileTask } from '@/worker/tasks/readFile';
-import { collectNamesTask } from '@/worker/tasks/collectNames';
-import { runMonthTask } from '@/worker/tasks/runMonth';
-import type { SourceId } from '@/core/types';
-import type { RunSettings } from '@/core/runMonth';
 
-const DIR = 'samples/2026-10';
-const present = existsSync(DIR);
-
-async function loadFiles(): Promise<{ sourceId: SourceId; file: File }[]> {
-  const out: { sourceId: SourceId; file: File }[] = [];
-  for (const name of readdirSync(DIR).filter((f) => f.endsWith('.xlsx') && !/sponsor-wise|drr format/i.test(f))) {
-    const file = new File([readFileSync(join(DIR, name))], name);
-    const { identification } = await readFileTask({ file, headersOnly: true });
-    out.push({ sourceId: identification.sourceId as SourceId, file });
-  }
-  return out;
-}
-
-describe.skipIf(!present)('October 2026 pipeline on the real exports', () => {
+describe.skipIf(!samplesPresent)('October 2026 pipeline on the real exports', () => {
   it('runs end to end with every doctor accepted as suggested', { timeout: 180_000 }, async () => {
-    const files = await loadFiles();
-    const base: RunSettings = {
-      sources: { version: 1, sources: DEFAULT_SOURCE_MAPPINGS.map((m) => structuredClone(m)) },
-      doctors: { version: 1, doctors: [], departments: [], sponsors: [] },
-      rules: loadDefaultRules(),
-    };
-
-    // Doctors: accept the suggestions, as a user would on the Doctors page.
-    const names = await collectNamesTask({
-      sources: files
-        .map((f) => ({ ...f, mapping: base.sources.sources.find((m) => m.sourceId === f.sourceId)!, required: [] as never[] }))
-        .filter((s) => s.mapping.fields.doctor),
-    });
-    const settings: RunSettings = {
-      ...base,
-      doctors: { ...base.doctors, doctors: acceptSuggestions([], suggestDoctors(names.doctors, [])) },
-    };
-
-    const run = await runMonthTask({ month: '2026-10', files, settings });
+    const { run, settings } = await runOctober();
     const d = run.diagnostics;
 
     for (const s of d.sources.filter((x) => x.needed)) {
@@ -81,6 +42,5 @@ describe.skipIf(!present)('October 2026 pipeline on the real exports', () => {
     expect(d.unmatchedDoctors).toEqual([]);
     expect(run.facts.length).toBeGreaterThan(1000);
     expect(new DoctorMatcher(settings.doctors.doctors).conflicts).toEqual([]);
-    void NameCounter;
   });
 });

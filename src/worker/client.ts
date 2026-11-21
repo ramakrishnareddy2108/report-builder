@@ -4,6 +4,8 @@ import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } f
 import type { CollectNamesRequest, CollectNamesResult } from './tasks/collectNames';
 import type { RunOutput } from '@/core/runMonth';
 import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
+import type { BuildReportsRequest, BuildReportsResult, CheckTemplatesRequest, InspectTemplateRequest, InspectTemplateResult } from './tasks/reports';
+import type { CheckResult } from '@/core/types';
 import type { RunMonthRequest } from './tasks/runMonth';
 
 type Pending = {
@@ -73,4 +75,16 @@ export function collectNamesInWorker(
 
 export function runMonthInWorker(request: RunMonthRequest, onProgress?: (p: TaskProgress) => void): Promise<RunOutput> {
   return runTask('runMonth', request, onProgress);
+}
+
+export function checkTemplatesInWorker(request: CheckTemplatesRequest): Promise<CheckResult[]> {
+  return runTask('checkTemplates', request);
+}
+
+export function buildReportsInWorker(request: BuildReportsRequest, onProgress?: (p: TaskProgress) => void): Promise<BuildReportsResult> {
+  return runTask('buildReports', request, onProgress);
+}
+
+export function inspectTemplateInWorker(request: InspectTemplateRequest): Promise<InspectTemplateResult> {
+  return runTask('inspectTemplate', request);
 }

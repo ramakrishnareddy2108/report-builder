@@ -5,6 +5,7 @@ import { WorkbookReadError } from '@/excel/readWorkbook';
 import type { TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import { collectNamesTask } from './tasks/collectNames';
 import { readFileTask } from './tasks/readFile';
+import { buildReportsTask, checkTemplatesTask, inspectTemplateTask } from './tasks/reports';
 import { runMonthTask } from './tasks/runMonth';
 
 type WorkerScope = {
@@ -32,6 +33,12 @@ scope.addEventListener('message', (e) => {
         return collectNamesTask(req.payload, progress);
       case 'runMonth':
         return runMonthTask(req.payload, progress);
+      case 'checkTemplates':
+        return checkTemplatesTask(req.payload);
+      case 'buildReports':
+        return buildReportsTask(req.payload, progress);
+      case 'inspectTemplate':
+        return inspectTemplateTask(req.payload);
     }
   };
 

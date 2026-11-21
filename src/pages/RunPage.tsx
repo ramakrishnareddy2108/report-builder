@@ -11,6 +11,7 @@ import { MonthPicker } from '@/components/MonthPicker';
 import { PageHeader } from '@/components/PageHeader';
 import { AttributionSummary } from '@/components/run/AttributionSummary';
 import { ChecksPanel } from '@/components/run/ChecksPanel';
+import { DownloadReports } from '@/components/run/DownloadReports';
 import { ReportGrid } from '@/components/run/ReportGrid';
 import { RunActions } from '@/components/run/RunActions';
 import { RunStatusPanel, allSourcesReady } from '@/components/run/RunStatusPanel';
@@ -182,6 +183,7 @@ function Results({ ws }: { ws: Workspace }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <RunActions ws={ws} />
+        <DownloadReports ws={ws} />
         <Tabs defaultValue="doctors">
           <TabsList>
             <TabsTrigger value="doctors">Doctor-wise</TabsTrigger>

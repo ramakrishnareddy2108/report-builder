@@ -4,6 +4,8 @@
 import type { CollectNamesRequest, CollectNamesResult } from './tasks/collectNames';
 import type { RunOutput } from '@/core/runMonth';
 import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
+import type { BuildReportsRequest, BuildReportsResult, CheckTemplatesRequest, InspectTemplateRequest, InspectTemplateResult } from './tasks/reports';
+import type { CheckResult } from '@/core/types';
 import type { RunMonthRequest } from './tasks/runMonth';
 
 export type TaskProgress = {
@@ -19,6 +21,9 @@ export type TaskMap = {
   readFile: { request: ReadFileRequest; result: ReadFileResult };
   collectNames: { request: CollectNamesRequest; result: CollectNamesResult };
   runMonth: { request: RunMonthRequest; result: RunOutput };
+  checkTemplates: { request: CheckTemplatesRequest; result: CheckResult[] };
+  buildReports: { request: BuildReportsRequest; result: BuildReportsResult };
+  inspectTemplate: { request: InspectTemplateRequest; result: InspectTemplateResult };
 };
 export type TaskName = keyof TaskMap;
 
