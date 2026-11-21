@@ -16,3 +16,6 @@ samples/
 # Editor / OS
 .DS_Store
 Thumbs.db
+
+# Derived from real samples
+docs/source-profile.md
