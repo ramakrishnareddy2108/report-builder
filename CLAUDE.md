@@ -109,18 +109,29 @@ All have 2 title rows. The header is on row 3.
 |---|---|---|---|
 | ipAdmissions | IP Admissions report | Sheet1 | ADMISSIONNO, ADMISSIONDT, DOCTORNAME, DEPARTMENTNAME, ORGANIZATIONNAME |
 | ipDischarge | IP Discharge Report | Sheet1 | ADMISSIONNO, DISCHARGEDT, DOCTORNAME, DEPARTMENTNAME, ORGANIZATIONNAME, GROSSAMOUNT, CONCESSION |
-| ipGeneralBill | IP General Bill Breakup | Sheet1 | BILLNO, BILLDT, ADMISSIONNO, GROSSAMOUNT, CONCESSION, BILLSTATUS, DOCTORNAME, DEPARTMENTNAME, (org name in a later column) |
-| ipBillBreakups | IP Bill Breakups | Sheet1 | BILLNO, ADMISSIONNO, DOCTORNAME, DEPARTMENTNAME, ORGANIZATIONNAME, GROSS, PHARMACY, PHARPURCAMOUNT |
-| opBilling | OP Billing Report | Sheet1 | BILLNO, BILLDT, UMRNO, DOCTORNAME, DEPARTMENTNAME, NETAMOUNT, BILLTYPE |
-| opConsultations | OP Consultations Report | Sheet1 | CONSULTATIONNO, CONSULTATIONDT, UMRNO, DOCTORNAME, DEPARTMENTNAME, Net Amount (formula cell → read cached value), ORGANIZATIONNAME |
-| opPharmacySales | gst op pharmacy sales | "OP pharmacy sales data" (3rd sheet; others are pivots) | BILLNO, BILLDT, UMRNO, ADMNNO, ORGANIZATIONNAME, SALEVALUE_BEFORETAX, PURCHASEVALUE_BEFORE_TAX |
-| opReturns | op returns report | Sheet1 | BILLNO, BILLDT, ORIGINAL_BILLNO, UMRNO, ADMISSIONNO, ORGANIZATIONNAME, SALEVALUE_BEFORETAX |
+| ipGeneralBill | IP General Bill Breakup | Sheet1 | BILLNO, BILLDT (text), ADMISSIONNO, GROSSAMOUNT, CONCESSION, BILLSTATUS, DOCTORNAME, DEPARTMENTNAME, ORGNAME (sponsor, col AH) |
+| ipBillBreakups | IP Bill Breakups | Sheet1 | BILLNO, BILLDT (text), ADMISSIONNO, DOCTORNAME, DEPARTMENTNAME, ORGANIZATIONNAME, GROSS, PHARMACY, PHARPURCAMOUNT, BILLTYPE |
+| opBilling | OP Billing Report | Sheet1 | BILLNO, BILLDT, UMRNO, DOCTORNAME, DEPARTMENTNAME, NETAMOUNT, BILLTYPE, ORGANIZATIONNAME |
+| opConsultations | OP Consultations Report | Sheet1 | CONSULTATIONNO, CONSULTATIONDT, UMRNO, DOCTORNAME, DEPARTMENTNAME, Net Amount (formula `+J-K` → read cached value), ORGANIZATIONNAME |
+| opPharmacySales | gst op pharmacy sales | "OP pharmacy sales data" (3rd of 5 sheets; the others are pivots / summaries) | BILLNO, BILLDT, UMRNO, ADMNNO, ORGANIZATIONNAME, SALEVALUE_BEFORETAX, PURCHASEVALUE_BEFORE_TAX |
+| opReturns | op returns report | Sheet1 (not `returns op`, see below) | BILLNO, BILLDT, ORIGINAL_BILLNO, UMRNO, ADMISSIONNO, ORGANIZATIONNAME, SALEVALUE_BEFORETAX |
 
-Things to know about these files:
+Things to know about these files (from `scripts/profile-samples.ts`, October 2026):
 
 - Doctor names vary in case, leading spaces and dots: 84 raw spellings collapse to 46 normalised names.
 - Department names vary in case.
 - Pharmacy has **no doctor column**.
+- **Sponsor column name differs:** ipGeneralBill calls it `ORGNAME`; all others use `ORGANIZATIONNAME`.
+- **IP column name differs:** opPharmacySales uses `ADMNNO`, opReturns uses `ADMISSIONNO`.
+- **Text dates:** `BILLDT` / `ADMISSIONDT` / `DISCHARGEDT` in ipGeneralBill and ipBillBreakups are text like `02-OCT-2026`, not Excel dates. Parse `DD-MON-YYYY`.
+- **Duplicate header:** ipBillBreakups has `ADMISSIONDT` twice (col C as text, col AS as a date). Column mapping must handle duplicate header names (e.g. by column letter or first/second occurrence).
+- **Grand-total footer row:** ipDischarge, opBilling and opConsultations end with a totals row that has no ID (e.g. ADMISSIONNO / BILLNO blank). Skip it as data (counted in Checks), but it can be used for the source-total check.
+- **Excel dates are IST:** SheetJS returns dates like `2026-10-11T18:30:00Z` (= 12 Oct IST midnight). Convert to calendar dates in Asia/Kolkata, never by slicing the UTC ISO string.
+- **Pharmacy files are line-item level:** one row per item, so BILLNO repeats (opPharmacySales: 12,586 rows ≈ 2,973 bills). The "duplicate bill no." check does not apply to opPharmacySales or opReturns.
+- **opReturns extra sheets:** `Sheet4` is a pivot; `returns op` is a hand-filtered copy of Sheet1 holding only rows with empty ADMISSIONNO (OP returns). Read Sheet1 and apply the filter in the rule instead.
+- **Values seen:** ipGeneralBill BILLSTATUS = `CLEARED` (346) / `PENDING` (215). opBilling BILLTYPE = `OP` / `Corporate.` (with trailing dot). ipBillBreakups BILLTYPE = `C` / `G`. STATUS is `A` on every row where it exists.
+- ipDischarge also has a `Net Amount` formula column (`+AB-AD`).
+- Other sheets (`Sheet2`, `Sheet3`) in the HIS exports are empty.
 
 ## DRR output (template: `DRR Format.xlsx`)
 
@@ -138,7 +149,14 @@ Things to know about these files:
   - Clear unused pre-numbered rows.
   - The tool also computes Total Revenue and Gross Profit itself, and a Check compares them with the template formula logic.
 
-Sponsor-wise template: same layout, header row 4, `Sponsor Name` instead of Doctor / Department, no salary or incentive columns. Same fill approach.
+Sponsor-wise template (`Sponsor-wise Revenue Report.xlsx`): header row 4, columns A–L, same fill approach:
+`S.No. | Sponsor Name | Month | IP Count | IP Revenue | OP Revenue | OP Pharmacy | Total Revenue | OP Pharmacy Cost | IP Pharmacy revenue Net | Ip Pharmacy Cost | Gross Profit`
+
+- No Department, Departmental Issues Cost, Salary Cost, Incentives or Professional Fee columns.
+- Row 2 has `SUBTOTAL(9, X5:X960)` totals.
+- Rows 5–496 are pre-numbered (S.No. is not strictly sequential) and contain formulas:
+  - `Total Revenue = E+F+G`
+  - `Gross Profit = H-I-K`
 
 ## Default measure rules (proposed — must be confirmed against a filled October DRR)
 
@@ -147,7 +165,7 @@ Sponsor-wise template: same layout, header row 4, `Sponsor Name` instead of Doct
 | IP_COUNT | ipDischarge | 1 per row | — |
 | IP_REVENUE | ipGeneralBill | GROSSAMOUNT − CONCESSION | include PENDING? (config flag) |
 | OP_REVENUE | opBilling | NETAMOUNT | opConsultations added only if `includeConsultations` flag is on |
-| OP_PHARMACY | opPharmacySales − opReturns | SALEVALUE_BEFORETAX | only rows with empty ADMNNO; doctor via attribution |
+| OP_PHARMACY | opPharmacySales − opReturns | SALEVALUE_BEFORETAX | only rows with empty ADMNNO (sales) / empty ADMISSIONNO (returns); doctor via attribution |
 | OP_PHARMACY_COST | opPharmacySales | PURCHASEVALUE_BEFORE_TAX | same rows and attribution |
 | IP_PHARMACY_NET | ipBillBreakups | PHARMACY | — |
 | IP_PHARMACY_COST | ipBillBreakups | PHARPURCAMOUNT | — |
