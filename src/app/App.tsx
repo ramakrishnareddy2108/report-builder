@@ -7,6 +7,7 @@ import { BottomNav } from './BottomNav';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { UpdateBanner } from './UpdateBanner';
 import { listenToHash, useAppStore } from './store';
 
 export function App() {
@@ -30,6 +31,7 @@ export function App() {
       <div className="flex h-dvh bg-background text-foreground">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
+          <UpdateBanner />
           <Header />
           <main id="main" tabIndex={-1} className="flex-1 overflow-auto p-4 pb-24 outline-none md:p-6 md:pb-6">
             {/* A new key per page clears an error from the page before. */}
