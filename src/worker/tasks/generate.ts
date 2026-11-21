@@ -10,11 +10,10 @@ import { combinedWorkbookBytes } from '@/engine/output';
 import type { ReportResult } from '@/engine/report';
 import type { CombinedTable, ParamValues, SourceSummary } from '@/engine/types';
 import type { TemplateMappingEntry } from '@/excel/fillTemplate';
-import { openWorkbook } from '@/excel/readWorkbook';
 import type { Recipe } from '@/recipe/schema';
 import type * as XLSX from 'xlsx';
 import type { TaskProgress } from '../protocol';
-import { getLastCombined, setLastCombined } from '../state';
+import { getLastCombined, setLastCombined, workbookFor } from '../state';
 
 export type GenerateRequest = {
   recipe: Recipe;
@@ -40,15 +39,10 @@ export type GenerateTaskResult = {
 const PREVIEW_ROWS = 200;
 
 export async function generateTask(req: GenerateRequest, onProgress: (p: TaskProgress) => void = () => {}): Promise<GenerateTaskResult> {
-  const workbooks = new Map<File, XLSX.WorkBook>();
   const files: { sourceId: string; fileName: string; workbook: XLSX.WorkBook }[] = [];
   for (const [i, a] of req.assignments.entries()) {
     onProgress({ stage: `Opening ${a.file.name}`, fraction: (i / Math.max(req.assignments.length, 1)) * 0.1 });
-    let workbook = workbooks.get(a.file);
-    if (!workbook) {
-      workbook = openWorkbook(new Uint8Array(await a.file.arrayBuffer()));
-      workbooks.set(a.file, workbook);
-    }
+    const workbook = await workbookFor(a.file);
     files.push({ sourceId: a.sourceId, fileName: a.file.name, workbook });
   }
 

@@ -3,6 +3,7 @@
 import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import type { CombineRequest, CombineTaskResult } from './tasks/combine';
 import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
+import type { PreviewRequest, PreviewResult } from './tasks/preview';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 type Pending = {
@@ -71,4 +72,9 @@ export function generateInWorker(request: GenerateRequest, onProgress?: (p: Task
 /** The combined table of the last generate run, as Excel bytes. */
 export function exportCombinedInWorker(): Promise<Uint8Array> {
   return runTask('exportCombined', null);
+}
+
+/** Steps 1–7 (and optionally the report) on the sample files, for the Prepare and Report tabs. */
+export function previewInWorker(request: PreviewRequest, onProgress?: (p: TaskProgress) => void): Promise<PreviewResult> {
+  return runTask('preview', request, onProgress);
 }

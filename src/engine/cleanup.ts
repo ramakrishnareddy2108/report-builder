@@ -21,11 +21,17 @@ export type CleanupReport = {
   cleanNames: number;
   /** Every raw → clean mapping that changed the text, with how many rows it covers. */
   mappings: CleanupMapping[];
+  /** Every distinct raw spelling with its clean name and row count (changed or not). */
+  values: CleanupMapping[];
+  /** Pairs of clean names that look like the same person or place: worth a look. */
+  suspicious: SuspiciousPair[];
   /** Clean names that no alias touched (informational: normalising already groups them). */
   unmatchedByAlias: { name: string; count: number }[];
   /** Rows whose value in this column is blank (left blank). */
   blankRows: number;
 };
+
+export type SuspiciousPair = { a: string; b: string; reason: string };
 
 export type CleanupResult = { reports: CleanupReport[]; issues: Issue[] };
 
@@ -54,6 +60,35 @@ function display(s: string, rule: CleanupRule): string {
     default:
       return s;
   }
+}
+
+const MAX_NAMES_FOR_PAIRS = 1500;
+const MAX_PAIRS = 50;
+
+const words = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/** Names that probably mean the same thing: the same letters with other spacing or dots, or one name inside the other. */
+export function findSuspicious(names: readonly string[]): SuspiciousPair[] {
+  if (names.length > MAX_NAMES_FOR_PAIRS) return [];
+  const out: SuspiciousPair[] = [];
+  const byLetters = new Map<string, string[]>();
+  for (const n of names) {
+    const key = words(n).join('');
+    byLetters.set(key, [...(byLetters.get(key) ?? []), n]);
+  }
+  for (const group of byLetters.values()) {
+    for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) out.push({ a: group[i] as string, b: group[j] as string, reason: 'Same letters, different spacing or punctuation' });
+  }
+  const tokens = names.map((n) => new Set(words(n)));
+  for (let i = 0; i < names.length && out.length < MAX_PAIRS; i++) {
+    for (let j = 0; j < names.length && out.length < MAX_PAIRS; j++) {
+      const a = tokens[i] as Set<string>;
+      const b = tokens[j] as Set<string>;
+      if (i === j || a.size < 2 || a.size >= b.size || ![...a].every((t) => b.has(t))) continue;
+      out.push({ a: names[i] as string, b: names[j] as string, reason: 'One name contains the other' });
+    }
+  }
+  return out.slice(0, MAX_PAIRS);
 }
 
 /** Cleans the table IN PLACE (rows are ours) and reports what happened. */
@@ -117,6 +152,7 @@ export function cleanup(table: CombinedTable, rules: readonly CleanupRule[]): Cl
 
     // pass 2: write the clean names back and record the mappings
     const mappingCount = new Map<string, CleanupMapping>();
+    const valueCount = new Map<string, CleanupMapping>();
     for (const row of table.rows) {
       const v = row[column];
       if (v === null || v === undefined || String(v).trim() === '') continue;
@@ -126,6 +162,9 @@ export function cleanup(table: CombinedTable, rules: readonly CleanupRule[]): Cl
       if (t !== undefined) key = normaliseKey(t, rule);
       const clean = cleanOf.get(key) as string;
       row[column] = clean;
+      const all = valueCount.get(raw) ?? { raw, clean, count: 0 };
+      all.count++;
+      valueCount.set(raw, all);
       if (clean !== raw) {
         const m = mappingCount.get(raw) ?? { raw, clean, count: 0 };
         m.count++;
@@ -138,6 +177,8 @@ export function cleanup(table: CombinedTable, rules: readonly CleanupRule[]): Cl
       rawNames: rawNames.size,
       cleanNames: groups.size,
       mappings: [...mappingCount.values()].sort((a, b) => b.count - a.count || a.raw.localeCompare(b.raw)),
+      values: [...valueCount.values()].sort((a, b) => a.clean.localeCompare(b.clean) || b.count - a.count),
+      suspicious: findSuspicious([...cleanOf.values()]),
       unmatchedByAlias: [...groups.entries()]
         .filter(([, g]) => !g.aliased)
         .map(([key, g]) => ({ name: cleanOf.get(key) as string, count: g.rows }))

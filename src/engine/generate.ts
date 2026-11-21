@@ -39,14 +39,31 @@ export type GenerateResult = {
 
 export type GenerateProgress = (p: { stage: string; fraction: number; detail?: string }) => void;
 
-export async function generate(input: GenerateInput, onProgress: GenerateProgress = () => {}): Promise<GenerateResult> {
+/** Everything up to (and including) the lookups: what the Prepare tab and the report preview need. */
+export type PreparedData = {
+  issues: Issue[];
+  table: CombinedTable;
+  sources: SourceSummary[];
+  cleanup: CleanupReport[];
+  lookups: LookupResult[];
+  /** True when an error stopped the steps (the table may be incomplete). */
+  stopped: boolean;
+};
+
+/**
+ * Steps 1–7: read every source, combine, clean names, run lookups.
+ * `requireParams` makes an empty parameter an error (Generate); the recipe builder previews without it.
+ */
+export function prepareData(input: GenerateInput, onProgress: GenerateProgress = () => {}, requireParams = true): PreparedData {
   const { recipe } = input;
   const issues: Issue[] = [];
   const readings: SourceReading[] = [];
   const params = paramValues(recipe.parameters, input.params);
 
-  for (const p of recipe.parameters) {
-    if ((input.params[p.name] ?? '').trim() === '') issues.push({ level: 'error', message: `Enter a value for “${p.label || p.name}”.`, column: p.name });
+  if (requireParams) {
+    for (const p of recipe.parameters) {
+      if ((input.params[p.name] ?? '').trim() === '') issues.push({ level: 'error', message: `Enter a value for “${p.label || p.name}”.`, column: p.name });
+    }
   }
 
   // 1–4: read every source
@@ -77,24 +94,39 @@ export async function generate(input: GenerateInput, onProgress: GenerateProgres
     void _rows;
     return { ...rest, fileName };
   });
-
-  const finishEarly = (cleanupReports: CleanupReport[] = [], lookups: LookupResult[] = []): GenerateResult => {
-    const checks = buildChecks({ recipe, issues, sources, combinedRows: table.rows.length, cleanup: cleanupReports, lookups, report: null });
-    return { canDownload: false, report: null, combined: table, checks, sources, cleanup: cleanupReports, lookups, workbookBytes: null, templateMapping: null };
-  };
-  if (issues.some((i) => i.level === 'error')) return finishEarly();
+  const stop = (cleanupReports: CleanupReport[] = [], lookups: LookupResult[] = []): PreparedData => ({ issues, table, sources, cleanup: cleanupReports, lookups, stopped: true });
+  if (issues.some((i) => i.level === 'error')) return stop();
 
   // 6: names
   onProgress({ stage: 'Cleaning names', fraction: 0.65 });
   const cleaned = cleanup(table, recipe.cleanup);
   issues.push(...cleaned.issues);
-  if (cleaned.issues.some((i) => i.level === 'error')) return finishEarly(cleaned.reports);
+  if (cleaned.issues.some((i) => i.level === 'error')) return stop(cleaned.reports);
 
   // 7: lookups
   onProgress({ stage: 'Matching lookups', fraction: 0.72 });
   const looked = runLookups(table, recipe.lookups, recipe, params);
   issues.push(...looked.issues);
-  if (looked.issues.some((i) => i.level === 'error')) return finishEarly(cleaned.reports, looked.results);
+  if (looked.issues.some((i) => i.level === 'error')) return stop(cleaned.reports, looked.results);
+  return { issues, table, sources, cleanup: cleaned.reports, lookups: looked.results, stopped: false };
+}
+
+export async function generate(input: GenerateInput, onProgress: GenerateProgress = () => {}): Promise<GenerateResult> {
+  const { recipe } = input;
+  const params = paramValues(recipe.parameters, input.params);
+  const prepared = prepareData(input, onProgress);
+  const { issues, table, sources } = prepared;
+  const cleaned = { reports: prepared.cleanup };
+  const looked = { results: prepared.lookups };
+
+  if (prepared.stopped) {
+    const checks = buildChecks({ recipe, issues, sources, combinedRows: table.rows.length, cleanup: prepared.cleanup, lookups: prepared.lookups, report: null });
+    return { canDownload: false, report: null, combined: table, checks, sources, cleanup: prepared.cleanup, lookups: prepared.lookups, workbookBytes: null, templateMapping: null };
+  }
+  const finishEarly = (cleanupReports: CleanupReport[] = [], lookups: LookupResult[] = []): GenerateResult => {
+    const checks = buildChecks({ recipe, issues, sources, combinedRows: table.rows.length, cleanup: cleanupReports, lookups, report: null });
+    return { canDownload: false, report: null, combined: table, checks, sources, cleanup: cleanupReports, lookups, workbookBytes: null, templateMapping: null };
+  };
 
   // 8: report
   onProgress({ stage: 'Building the report', fraction: 0.8 });

@@ -5,11 +5,9 @@ import { combine } from '@/engine/combine';
 import { paramValues } from '@/engine/rowContext';
 import { readSource } from '@/engine/readSource';
 import type { CombinedTable, Issue, ParamValues, ReadSourceResult, SourceSummary } from '@/engine/types';
-import { openWorkbook } from '@/excel/readWorkbook';
 import type { Recipe } from '@/recipe/schema';
-import type * as XLSX from 'xlsx';
 import type { TaskProgress } from '../protocol';
-import { setLastCombined } from '../state';
+import { setLastCombined, workbookFor } from '../state';
 
 export type CombineRequest = {
   recipe: Recipe;
@@ -33,7 +31,6 @@ type Progress = (p: TaskProgress) => void;
 export async function combineTask(req: CombineRequest, onProgress: Progress = () => {}): Promise<CombineTaskResult> {
   const { recipe } = req;
   const issues: Issue[] = [];
-  const workbooks = new Map<File, XLSX.WorkBook>();
   const readings: Parameters<typeof combine>[0][number][] = [];
   const params = paramValues(recipe.parameters, req.params);
 
@@ -49,11 +46,7 @@ export async function combineTask(req: CombineRequest, onProgress: Progress = ()
       );
       continue;
     }
-    let workbook = workbooks.get(assigned.file);
-    if (!workbook) {
-      workbook = openWorkbook(new Uint8Array(await assigned.file.arrayBuffer()));
-      workbooks.set(assigned.file, workbook);
-    }
+    const workbook = await workbookFor(assigned.file);
     const result = readSource({ name: assigned.file.name, workbook }, source, params);
     readings.push({ source, fileName: assigned.file.name, result });
   }

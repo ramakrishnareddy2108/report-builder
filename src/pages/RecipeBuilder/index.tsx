@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUnsavedWarning } from '@/lib/useUnsavedWarning';
 import { useBuilder } from './builderStore';
 import { ParametersEditor } from './ParametersEditor';
+import { PrepareTab } from './PrepareTab';
+import { ReportTab } from './ReportTab';
 import { SourcesTab } from './SourcesTab';
 
 const TABS = [
@@ -121,7 +123,13 @@ export function RecipeBuilderPage() {
         <TabsContent value="sources" className="pt-2">
           <SourcesTab />
         </TabsContent>
-        {TABS.slice(1).map((t) => (
+        <TabsContent value="prepare" className="pt-2">
+          <PrepareTab />
+        </TabsContent>
+        <TabsContent value="report" className="pt-2">
+          <ReportTab />
+        </TabsContent>
+        {TABS.slice(3).map((t) => (
           <TabsContent key={t.id} value={t.id} className="pt-2">
             <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">This step is coming next.</p>
           </TabsContent>
