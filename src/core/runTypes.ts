@@ -69,13 +69,13 @@ export type SourceDiag = {
   skipped: Record<SkipReason, Counted>;
   /** Sum of each mapped amount column over the mapped rows (integer paise). */
   fieldTotals: Partial<Record<FieldKey, number>>;
-  /** Sum of the same columns on the file's own grand-total row(s). */
+  /** Sum of the same columns on the file's own grand-total row(s); only columns that have a number there. */
   footerTotals: Partial<Record<FieldKey, number>>;
   footerRows: number;
   /** Bill / admission numbers that appear more than once (only when the mapping says they are unique). */
   duplicateRefs: { rows: number; examples: { ref: string; rows: number[] }[] };
-  /** Amount or date cells that could not be read, in any mapped column. */
-  unreadableCells: Counted;
+  /** Amount or date cells that could not be read in mapped columns no rule uses (used columns are in TermStat.badAmount). */
+  unreadableUnused: Counted;
 };
 
 export type UnmatchedDoctor = {

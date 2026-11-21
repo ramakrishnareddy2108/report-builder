@@ -5,6 +5,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { pivot, totalValues } from '@/core/aggregate';
+import { runChecks } from '@/core/checks';
 import { formatINR } from '@/core/money';
 import { MEASURES } from '@/core/measures';
 import { DEFAULT_SOURCE_MAPPINGS } from '@/core/sourceDefaults';
@@ -71,7 +72,10 @@ describe.skipIf(!present)('October 2026 pipeline on the real exports', () => {
     for (const f of run.facts) if (f.attributionStatus) status[f.attributionStatus] = (status[f.attributionStatus] ?? 0) + 1;
     console.info('pharmacy attribution rows ' + JSON.stringify(status));
     console.info(`unmatched doctors ${d.unmatchedDoctors.length}, duplicate refs ` + JSON.stringify(d.sources.map((s) => [s.sourceId, s.duplicateRefs.rows]).filter(([, n]) => n)));
-    console.info(`op overlap pairs ${d.opOverlap.pairs}; unreadable cells ` + JSON.stringify(d.sources.map((s) => [s.sourceId, s.unreadableCells.count]).filter(([, n]) => n)));
+    console.info(`op overlap pairs ${d.opOverlap.pairs}; unreadable cells ` + JSON.stringify(d.sources.map((s) => [s.sourceId, s.unreadableUnused.count]).filter(([, n]) => n)));
+
+    const checks = runChecks({ month: '2026-10', rules: settings.rules, doctors: settings.doctors.doctors, diagnostics: d, facts: run.facts, previous: null });
+    for (const c of checks.filter((x) => x.level !== 'Pass')) console.info(`CHECK ${c.level}: ${c.title} - ${c.message.slice(0, 200)}`);
 
     expect(d.ruleProblems).toEqual([]);
     expect(d.unmatchedDoctors).toEqual([]);

@@ -59,12 +59,16 @@ function sumField(rows: readonly { values: MappedRow['values'] }[], key: FieldKe
   return sumPaise(rows.map((r) => (typeof r.values[key] === 'number' ? (r.values[key] as number) : 0)));
 }
 
+const hasNumber = (rows: readonly { values: MappedRow['values'] }[], key: FieldKey): boolean =>
+  rows.some((r) => typeof r.values[key] === 'number');
+
 /** Diagnostics for a source that was read. */
 function readDiag(
   base: { sourceId: SourceId; needed: boolean; fileName: string },
   mapped: MappedSheet,
   fields: Partial<Record<FieldKey, unknown>>,
   refUnique: boolean,
+  usedFields: ReadonlySet<FieldKey>,
 ): SourceDiag {
   const { fileName } = base;
   const skipped = Object.fromEntries(SKIP_REASONS.map((r) => [r, emptyCounted()])) as Record<SkipReason, Counted>;
@@ -80,13 +84,14 @@ function readDiag(
   const footerTotals: SourceDiag['footerTotals'] = {};
   for (const key of money) {
     fieldTotals[key] = sumField(mapped.rows, key);
-    if (footer.length > 0) footerTotals[key] = sumField(footer, key);
+    if (hasNumber(footer, key)) footerTotals[key] = sumField(footer, key);
   }
 
-  const unreadableCells = emptyCounted();
+  const unreadableUnused = emptyCounted();
   for (const row of mapped.rows) {
     for (const issue of row.issues) {
-      addCounted(unreadableCells, { sourceFile: fileName, sourceRow: row.row, ref: refOf(row), detail: `${issue.field}: ${issue.message}` });
+      if (issue.field === 'rowFilter' || usedFields.has(issue.field)) continue; // counted by the rule terms
+      addCounted(unreadableUnused, { sourceFile: fileName, sourceRow: row.row, ref: refOf(row), detail: `${issue.field}: ${issue.message}` });
     }
   }
 
@@ -115,7 +120,7 @@ function readDiag(
     footerTotals,
     footerRows: footer.length,
     duplicateRefs,
-    unreadableCells,
+    unreadableUnused,
   };
 }
 
@@ -133,7 +138,7 @@ function notReadDiag(sourceId: SourceId, needed: boolean, status: 'missing' | 'f
     footerTotals: {},
     footerRows: 0,
     duplicateRefs: { rows: 0, examples: [] },
-    unreadableCells: emptyCounted(),
+    unreadableUnused: emptyCounted(),
   };
 }
 
@@ -165,7 +170,7 @@ export function buildRun({ month, settings, read }: BuildRunInput): RunOutput {
     } else {
       sources.set(sourceId, { sourceId, fileName: entry.fileName, mapped: entry.mapped });
       const mapping = settings.sources.sources.find((m) => m.sourceId === sourceId);
-      diag.push(readDiag({ sourceId, needed, fileName: entry.fileName }, entry.mapped, mapping?.fields ?? {}, mapping?.refUnique ?? false));
+      diag.push(readDiag({ sourceId, needed, fileName: entry.fileName }, entry.mapped, mapping?.fields ?? {}, mapping?.refUnique ?? false, requiredFields(settings.rules, sourceId)));
     }
   }
 

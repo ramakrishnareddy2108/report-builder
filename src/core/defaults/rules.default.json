@@ -4,6 +4,10 @@
     "includePendingIpBills": true,
     "includeConsultations": false
   },
+  "thresholds": {
+    "changePercent": 50,
+    "minChangePaise": 100000
+  },
   "rules": [
     {
       "measure": "IP_COUNT",

@@ -262,6 +262,8 @@ export type CheckResult = {
   rows?: number;
   amountPaise?: number;
   examples: CheckExample[];
+  /** Extra lines for the user, such as the names behind a count. */
+  details?: string[];
   /** Typed note; required on every Warning before a run can be Final. */
   note?: string;
 };

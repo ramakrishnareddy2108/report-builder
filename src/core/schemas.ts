@@ -192,8 +192,22 @@ export const RuleFlagsSchema = z.object({
   includeConsultations: z.boolean(),
 });
 
+/** When a doctor or department moving against the previous Final month is worth a warning. */
+export const CheckThresholdsSchema = z.object({
+  /** Warn when Total Revenue moves by more than this many percent. */
+  changePercent: z.number().min(1).max(10_000).default(50),
+  /** Ignore moves where both months are below this amount (integer paise), so tiny doctors do not make noise. */
+  minChangePaise: z.int().min(0).default(100_000),
+});
+
 export const RulesFileSchema = z
-  .object({ version, flags: RuleFlagsSchema, rules: z.array(MeasureRuleSchema) })
+  .object({
+    version,
+    flags: RuleFlagsSchema,
+    // Older files have no thresholds yet.
+    thresholds: CheckThresholdsSchema.default({ changePercent: 50, minChangePaise: 100_000 }),
+    rules: z.array(MeasureRuleSchema),
+  })
   .superRefine((file, ctx) => {
     addDuplicateIssues(ctx, file.rules, (r) => r.measure, 'rules', 'rule for measure');
     const present = new Set(file.rules.map((r) => r.measure));
@@ -327,6 +341,7 @@ export const CheckResultSchema = z.object({
   examples: z.array(
     z.object({ sourceFile: z.string(), sourceRow: ExcelRow, ref: z.string().nullable() }),
   ),
+  details: z.array(z.string()).optional(),
   note: z.string().optional(),
 });
 
