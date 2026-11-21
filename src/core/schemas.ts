@@ -415,12 +415,92 @@ export const SettingsUsedFileSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// settings/dashboards.json (v2 placeholder — tiles are defined in step 17)
+// settings/dashboards.json
 // ---------------------------------------------------------------------------
 
-export const DashboardsFileSchema = z.object({
-  version,
-  dashboards: z.array(z.looseObject({ id: NonEmpty, name: NonEmpty })),
+export const DIMENSIONS = ['month', 'doctor', 'department', 'sponsor'] as const;
+export type Dimension = (typeof DIMENSIONS)[number];
+export const DIMENSION_LABELS: Readonly<Record<Dimension, string>> = {
+  month: 'Month',
+  doctor: 'Doctor',
+  department: 'Department',
+  sponsor: 'Sponsor',
+};
+
+export const TILE_TYPES = ['kpi', 'bar', 'stackedBar', 'line', 'pie', 'table'] as const;
+export type TileType = (typeof TILE_TYPES)[number];
+export const TILE_TYPE_LABELS: Readonly<Record<TileType, string>> = {
+  kpi: 'Number (KPI)',
+  bar: 'Bar chart',
+  stackedBar: 'Stacked bar chart',
+  line: 'Line chart',
+  pie: 'Pie chart',
+  table: 'Table',
+};
+
+export const AGGREGATIONS = ['sum', 'count', 'avg'] as const;
+export type Aggregation = (typeof AGGREGATIONS)[number];
+export const COMPARISONS = ['none', 'previousMonth', 'sameMonthLastYear'] as const;
+export type Comparison = (typeof COMPARISONS)[number];
+export const SORTS = ['desc', 'asc', 'name'] as const;
+export type SortOrder = (typeof SORTS)[number];
+
+const NameList = z.array(NonEmpty);
+
+export const TileFiltersSchema = z.object({ doctors: NameList, departments: NameList, sponsors: NameList });
+
+export const TileSchema = z
+  .object({
+    id: NonEmpty,
+    title: NonEmpty,
+    type: z.enum(TILE_TYPES),
+    x: z.enum(DIMENSIONS),
+    /** Several measures draw one series each (for example IP, OP and pharmacy revenue). */
+    measures: z.array(MeasureCodeSchema).min(1, 'Choose at least one measure'),
+    agg: z.enum(AGGREGATIONS),
+    split: z.enum(DIMENSIONS).nullable(),
+    filters: TileFiltersSchema,
+    /** Keep only this many categories (by size); null keeps all. */
+    topN: z.int().min(1).max(100).nullable(),
+    sort: z.enum(SORTS),
+    compare: z.enum(COMPARISONS),
+  })
+  .superRefine((tile, ctx) => {
+    if (tile.split !== null && tile.split === tile.x) {
+      ctx.addIssue({ code: 'custom', message: 'Split by must differ from the X axis', path: ['split'] });
+    }
+    if (tile.split !== null && tile.measures.length > 1) {
+      ctx.addIssue({ code: 'custom', message: 'Split by needs a single measure', path: ['split'] });
+    }
+  });
+
+export const MonthRangeSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('all') }),
+  /** The newest Final month; follows new months automatically. */
+  z.object({ mode: z.literal('latest') }),
+  z.object({ mode: z.literal('last'), count: z.int().min(1).max(60) }),
+  z.object({ mode: z.literal('range'), from: MonthSchema, to: MonthSchema }),
+]);
+
+export const DashboardSchema = z
+  .object({
+    id: NonEmpty,
+    name: NonEmpty,
+    /** Global filters: the months, and optionally one department list and sponsor list for every tile. */
+    months: MonthRangeSchema,
+    departments: NameList,
+    sponsors: NameList,
+    tiles: z.array(TileSchema),
+  })
+  .superRefine((d, ctx) => {
+    addDuplicateIssues(ctx, d.tiles, (t) => t.id, 'tiles', 'tile id');
+    if (d.months.mode === 'range' && d.months.from > d.months.to) {
+      ctx.addIssue({ code: 'custom', message: 'The first month must not be after the last', path: ['months'] });
+    }
+  });
+
+export const DashboardsFileSchema = z.object({ version, dashboards: z.array(DashboardSchema) }).superRefine((file, ctx) => {
+  addDuplicateIssues(ctx, file.dashboards, (d) => d.id, 'dashboards', 'dashboard id');
 });
 
 // ---------------------------------------------------------------------------
@@ -452,6 +532,9 @@ export type RunInfoFile = z.infer<typeof RunInfoSchema>;
 export type SummaryFile = z.infer<typeof SummaryFileSchema>;
 export type SettingsUsedFile = z.infer<typeof SettingsUsedFileSchema>;
 export type DashboardsFile = z.infer<typeof DashboardsFileSchema>;
+export type Dashboard = z.infer<typeof DashboardSchema>;
+export type Tile = z.infer<typeof TileSchema>;
+export type MonthRange = z.infer<typeof MonthRangeSchema>;
 export type BackupManifest = z.infer<typeof BackupManifestSchema>;
 
 // ---------------------------------------------------------------------------

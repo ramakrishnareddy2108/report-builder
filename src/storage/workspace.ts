@@ -270,8 +270,23 @@ export class Workspace {
     await this.writeText(path, toJsonText(data));
   }
 
-  /** Write text via temp file + rename. */
-  async writeText(path: string, text: string): Promise<void> {
+  /** The last write started for each path: writes to one file never overlap. */
+  private readonly lastWrite = new Map<string, Promise<void>>();
+
+  /**
+   * Write text via temp file + rename. Two writes to the same file run one after the other
+   * (they share the temp file, so overlapping would make one of them fail), and the last one wins.
+   */
+  writeText(path: string, text: string): Promise<void> {
+    const previous = this.lastWrite.get(path) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => this.writeTextNow(path, text));
+    this.lastWrite.set(path, next);
+    return next.finally(() => {
+      if (this.lastWrite.get(path) === next) this.lastWrite.delete(path);
+    });
+  }
+
+  private async writeTextNow(path: string, text: string): Promise<void> {
     const { dir, name } = await this.parentOf(path, true);
     const d = dir as FsDir;
     const tmp = name + TEMP_SUFFIX;

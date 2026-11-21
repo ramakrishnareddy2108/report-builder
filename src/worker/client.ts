@@ -6,6 +6,7 @@ import type { RunOutput } from '@/core/runMonth';
 import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
 import type { BuildReportsRequest, BuildReportsResult, CheckTemplatesRequest, InspectTemplateRequest, InspectTemplateResult, ReadReportRequest, ReadReportResult } from './tasks/reports';
 import type { CompareExportInput } from '@/excel/compareSheet';
+import type { TableExportInput } from '@/excel/tableSheet';
 import type { CheckResult } from '@/core/types';
 import type { RunMonthRequest } from './tasks/runMonth';
 
@@ -96,4 +97,8 @@ export function readReportInWorker(request: ReadReportRequest): Promise<ReadRepo
 
 export function exportCompareInWorker(request: CompareExportInput): Promise<Uint8Array> {
   return runTask('exportCompare', request);
+}
+
+export function exportTableInWorker(request: TableExportInput): Promise<Uint8Array> {
+  return runTask('exportTable', request);
 }

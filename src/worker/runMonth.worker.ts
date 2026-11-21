@@ -5,7 +5,7 @@ import { WorkbookReadError } from '@/excel/readWorkbook';
 import type { TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import { collectNamesTask } from './tasks/collectNames';
 import { readFileTask } from './tasks/readFile';
-import { buildReportsTask, checkTemplatesTask, exportCompareTask, inspectTemplateTask, readReportTask } from './tasks/reports';
+import { buildReportsTask, checkTemplatesTask, exportCompareTask, exportTableTask, inspectTemplateTask, readReportTask } from './tasks/reports';
 import { runMonthTask } from './tasks/runMonth';
 
 type WorkerScope = {
@@ -43,6 +43,8 @@ scope.addEventListener('message', (e) => {
         return readReportTask(req.payload);
       case 'exportCompare':
         return exportCompareTask(req.payload);
+      case 'exportTable':
+        return exportTableTask(req.payload);
     }
   };
 

@@ -399,16 +399,32 @@ describe('SettingsUsedFileSchema', () => {
   });
 });
 
-describe('DashboardsFileSchema (placeholder)', () => {
-  it('accepts dashboards with an id and name and keeps other keys', () => {
-    const parsed = DashboardsFileSchema.parse({
-      version: 1,
-      dashboards: [{ id: 'x', name: 'Monthly Review', tiles: [] }],
-    });
-    expect(parsed.dashboards[0]).toHaveProperty('tiles');
+describe('DashboardsFileSchema', () => {
+  const tile = { id: 't1', title: 'Revenue', type: 'bar', x: 'month', measures: ['TOTAL_REVENUE'], agg: 'sum', split: null, filters: { doctors: [], departments: [], sponsors: [] }, topN: null, sort: 'desc', compare: 'none' };
+  const dashboard = { id: 'd1', name: 'Review', months: { mode: 'latest' }, departments: [], sponsors: [], tiles: [tile] };
+  const file = (d: unknown) => ({ version: 1, dashboards: [d] });
+
+  it('accepts a dashboard with tiles', () => {
+    expect(DashboardsFileSchema.safeParse(file(dashboard)).success).toBe(true);
+    expect(DashboardsFileSchema.safeParse({ version: 1, dashboards: [] }).success).toBe(true);
   });
 
-  it('rejects a dashboard without a name', () => {
-    expect(DashboardsFileSchema.safeParse({ version: 1, dashboards: [{ id: 'x' }] }).success).toBe(false);
+  it('rejects a dashboard without a name, or with an unknown measure, type or month mode', () => {
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, name: '' })).success).toBe(false);
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, tiles: [{ ...tile, measures: ['NOPE'] }] })).success).toBe(false);
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, tiles: [{ ...tile, type: 'radar' }] })).success).toBe(false);
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, months: { mode: 'sometimes' } })).success).toBe(false);
+  });
+
+  it('needs at least one measure; split must differ from X and needs a single measure', () => {
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, tiles: [{ ...tile, measures: [] }] })).success).toBe(false);
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, tiles: [{ ...tile, split: 'month' }] })).success).toBe(false);
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, tiles: [{ ...tile, split: 'doctor', measures: ['IP_REVENUE', 'OP_REVENUE'] }] })).success).toBe(false);
+  });
+
+  it('rejects duplicate ids and a month range that runs backwards', () => {
+    expect(DashboardsFileSchema.safeParse({ version: 1, dashboards: [dashboard, dashboard] }).success).toBe(false);
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, tiles: [tile, tile] })).success).toBe(false);
+    expect(DashboardsFileSchema.safeParse(file({ ...dashboard, months: { mode: 'range', from: '2026-10', to: '2026-01' } })).success).toBe(false);
   });
 });

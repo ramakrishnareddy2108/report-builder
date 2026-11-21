@@ -22,6 +22,8 @@ export type GroupRow = {
   /** Same for the same doctor, department or sponsor in every month (names are normalised). */
   key: string;
   name: string;
+  /** Doctor rows: the doctor's department as in the report ('' for others). */
+  department?: string;
   values: MeasureValues;
 };
 
@@ -85,7 +87,7 @@ export function monthDataFromRun(input: RunMonthInput): MonthData {
   const known = new Set(doctors.map((d) => d.id));
   const knownCosts = costs.filter((c) => known.has(c.doctorId));
 
-  const doctorRows = doctorReport(facts, costs, doctors, month).map((r) => ({ key: doctorKey(r.name), name: r.name, values: r.values }));
+  const doctorRows = doctorReport(facts, costs, doctors, month).map((r) => ({ key: doctorKey(r.name), name: r.name, department: r.department, values: r.values }));
   const departmentRows = pivot(facts, 'department', { costs: knownCosts, doctors }).map((r) => ({
     key: r.key,
     name: r.key === NONE_KEY ? NO_DEPARTMENT : r.key,
@@ -114,6 +116,7 @@ export function monthDataFromSummary(info: { runNumber: number; status: RunStatu
     return {
       key: doctorKey(r.name),
       name: r.name,
+      department: r.department,
       values: Object.fromEntries(MEASURES.map((m) => [m.code, computeMeasure(m.code, inputs)])) as MeasureValues,
     };
   });

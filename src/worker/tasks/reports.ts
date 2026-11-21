@@ -9,6 +9,7 @@ import type { CheckResult, FactRow } from '@/core/types';
 import { MEASURES, computeMeasure } from '@/core/measures';
 import { buildReport, reportFileName } from '@/excel/buildReport';
 import { buildCompareWorkbook, type CompareExportInput } from '@/excel/compareSheet';
+import { buildTableWorkbook, type TableExportInput } from '@/excel/tableSheet';
 import { readReportRows, type ReadReportRow } from '@/excel/readReport';
 import { checkTemplate } from '@/excel/templateCheck';
 import { TemplateError, loadTemplate } from '@/excel/templates';
@@ -123,4 +124,9 @@ export async function readReportTask(req: ReadReportRequest): Promise<ReadReport
 /** The Compare view as an Excel workbook. */
 export async function exportCompareTask(req: CompareExportInput): Promise<Uint8Array> {
   return buildCompareWorkbook(req);
+}
+
+/** A table (a dashboard tile's numbers) as an Excel workbook. */
+export async function exportTableTask(req: TableExportInput): Promise<Uint8Array> {
+  return buildTableWorkbook(req);
 }

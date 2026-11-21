@@ -4,10 +4,12 @@
 import { create } from 'zustand';
 import { loadDefaultRules } from '@/core/defaults';
 import {
+  DashboardsFileSchema,
   DoctorsFileSchema,
   RulesFileSchema,
   SCHEMA_VERSION,
   SourcesFileSchema,
+  type DashboardsFile,
   type DoctorsFile,
   type RulesFile,
   type SourcesFile,
@@ -22,10 +24,13 @@ type SettingsState = {
   sources: SourcesFile;
   doctors: DoctorsFile;
   rules: RulesFile;
+  /** null until dashboards.json exists (the Dashboards page then saves the starter dashboards). */
+  dashboards: DashboardsFile | null;
   load: (ws: Workspace) => Promise<void>;
   saveSources: (next: SourcesFile) => Promise<void>;
   saveDoctors: (next: DoctorsFile) => Promise<void>;
   saveRules: (next: RulesFile) => Promise<void>;
+  saveDashboards: (next: DashboardsFile) => Promise<void>;
 };
 
 const emptySources = (): SourcesFile => ({ version: SCHEMA_VERSION, sources: [] });
@@ -45,21 +50,24 @@ export const useSettings = create<SettingsState>()((set, get) => {
     sources: emptySources(),
     doctors: emptyDoctors(),
     rules: loadDefaultRules(),
+    dashboards: null,
 
     async load(ws) {
       set({ status: 'loading', error: null, workspace: ws });
       try {
         await ws.ensureLayout();
-        const [sources, doctors, rules] = await Promise.all([
+        const [sources, doctors, rules, dashboards] = await Promise.all([
           ws.readJson(paths.sources, SourcesFileSchema),
           ws.readJson(paths.doctors, DoctorsFileSchema),
           ws.readJson(paths.rules, RulesFileSchema),
+          ws.readJson(paths.dashboards, DashboardsFileSchema),
         ]);
         set({
           status: 'ready',
           sources: sources ?? emptySources(),
           doctors: doctors ?? emptyDoctors(),
           rules: rules ?? loadDefaultRules(),
+          dashboards,
         });
       } catch (err) {
         set({ status: 'error', error: err instanceof Error ? err.message : String(err) });
@@ -73,6 +81,10 @@ export const useSettings = create<SettingsState>()((set, get) => {
     async saveDoctors(next) {
       await requireWorkspace().writeJson(paths.doctors, next, DoctorsFileSchema);
       set({ doctors: next });
+    },
+    async saveDashboards(next) {
+      await requireWorkspace().writeJson(paths.dashboards, next, DashboardsFileSchema);
+      set({ dashboards: next });
     },
     async saveRules(next) {
       await requireWorkspace().writeJson(paths.rules, next, RulesFileSchema);
