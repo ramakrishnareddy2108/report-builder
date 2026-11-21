@@ -14,6 +14,9 @@ export type SaveState = 'idle' | 'saving' | 'saved' | 'invalid';
 type BuilderState = {
   recipe: Recipe | null;
   samples: Record<string, Sample>;
+  /** The tab on screen: sources, prepare, report, output or test. */
+  tab: string;
+  setTab: (tab: string) => void;
   saveState: SaveState;
   /** Why the recipe could not be saved yet (shown next to the name). */
   problem: string | null;
@@ -34,12 +37,14 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 export const useBuilder = create<BuilderState>()((set, get) => ({
   recipe: null,
   samples: {},
+  tab: 'sources',
+  setTab: (tab) => set({ tab }),
   saveState: 'idle',
   problem: null,
 
   open: (recipe) => {
     if (timer) clearTimeout(timer);
-    set({ recipe: structuredClone(recipe), samples: {}, saveState: 'saved', problem: null });
+    set({ recipe: structuredClone(recipe), samples: {}, tab: 'sources', saveState: 'saved', problem: null });
   },
 
   update: (mutate) => {

@@ -5,6 +5,7 @@ import { WorkbookReadError } from '@/excel/readWorkbook';
 import type { TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import { combineTask } from './tasks/combine';
 import { exportCombinedTask, generateTask } from './tasks/generate';
+import { inspectTemplateTask } from './tasks/inspectTemplate';
 import { previewTask } from './tasks/preview';
 import { inspectFileTask } from './tasks/inspectFile';
 
@@ -30,6 +31,8 @@ scope.addEventListener('message', (e) => {
         return inspectFileTask(req.payload, progress);
       case 'combine':
         return combineTask(req.payload, progress);
+      case 'inspectTemplate':
+        return inspectTemplateTask(req.payload);
       case 'preview':
         return previewTask(req.payload, progress);
       case 'generate':

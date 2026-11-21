@@ -10,7 +10,9 @@ import { useUnsavedWarning } from '@/lib/useUnsavedWarning';
 import { useBuilder } from './builderStore';
 import { ParametersEditor } from './ParametersEditor';
 import { PrepareTab } from './PrepareTab';
+import { OutputTab } from './OutputTab';
 import { ReportTab } from './ReportTab';
+import { TestTab } from './TestTab';
 import { SourcesTab } from './SourcesTab';
 
 const TABS = [
@@ -53,6 +55,8 @@ export function RecipeBuilderPage() {
   const recipe = useBuilder((s) => s.recipe);
   const saveState = useBuilder((s) => s.saveState);
   const update = useBuilder((s) => s.update);
+  const tab = useBuilder((s) => s.tab);
+  const setTab = useBuilder((s) => s.setTab);
 
   // Open the recipe from the library once, when this page is entered or another recipe is chosen.
   useEffect(() => {
@@ -112,7 +116,7 @@ export function RecipeBuilderPage() {
         </details>
       </div>
 
-      <Tabs defaultValue="sources" className="gap-4">
+      <Tabs value={tab} onValueChange={setTab} className="gap-4">
         <TabsList className="h-auto w-full justify-start overflow-x-auto" aria-label="Recipe steps">
           {TABS.map((t) => (
             <TabsTrigger key={t.id} value={t.id} className="min-h-10 shrink-0 px-3">
@@ -129,11 +133,12 @@ export function RecipeBuilderPage() {
         <TabsContent value="report" className="pt-2">
           <ReportTab />
         </TabsContent>
-        {TABS.slice(3).map((t) => (
-          <TabsContent key={t.id} value={t.id} className="pt-2">
-            <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">This step is coming next.</p>
-          </TabsContent>
-        ))}
+        <TabsContent value="output" className="pt-2">
+          <OutputTab />
+        </TabsContent>
+        <TabsContent value="test" className="pt-2">
+          <TestTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

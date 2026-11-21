@@ -4,6 +4,7 @@
 import type { CombineRequest, CombineTaskResult } from './tasks/combine';
 import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { PreviewRequest, PreviewResult } from './tasks/preview';
+import type { InspectTemplateRequest, InspectTemplateResult } from './tasks/inspectTemplate';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 export type TaskProgress = {
@@ -18,6 +19,7 @@ export type TaskProgress = {
 export type TaskMap = {
   inspectFile: { request: InspectFileRequest; result: InspectFileResult };
   combine: { request: CombineRequest; result: CombineTaskResult };
+  inspectTemplate: { request: InspectTemplateRequest; result: InspectTemplateResult };
   preview: { request: PreviewRequest; result: PreviewResult };
   generate: { request: GenerateRequest; result: GenerateTaskResult };
   exportCombined: { request: null; result: Uint8Array };

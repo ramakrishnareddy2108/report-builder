@@ -4,6 +4,7 @@ import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } f
 import type { CombineRequest, CombineTaskResult } from './tasks/combine';
 import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { PreviewRequest, PreviewResult } from './tasks/preview';
+import type { InspectTemplateRequest, InspectTemplateResult } from './tasks/inspectTemplate';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 type Pending = {
@@ -77,4 +78,9 @@ export function exportCombinedInWorker(): Promise<Uint8Array> {
 /** Steps 1–7 (and optionally the report) on the sample files, for the Prepare and Report tabs. */
 export function previewInWorker(request: PreviewRequest, onProgress?: (p: TaskProgress) => void): Promise<PreviewResult> {
   return runTask('preview', request, onProgress);
+}
+
+/** Where the report would go in an Excel template, and how its columns map. */
+export function inspectTemplateInWorker(request: InspectTemplateRequest): Promise<InspectTemplateResult> {
+  return runTask('inspectTemplate', request);
 }

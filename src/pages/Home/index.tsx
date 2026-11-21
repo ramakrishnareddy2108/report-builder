@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { blankRecipe } from '@/recipe/blank';
+import { checkRecipe, hasProblems } from '@/recipe/validate';
 import { ImportDialog } from './ImportDialog';
 
 const formatDate = (iso: string | undefined) =>
@@ -21,18 +22,21 @@ type Doomed = { kind: 'recipe' | 'dashboard'; id: string; name: string };
 function ItemCard(props: {
   title: string;
   detail: string;
+  /** Shown in amber under the detail line, for example when a recipe is not finished. */
+  attention?: string;
   primary: { label: string; icon: typeof Play; onClick: () => void };
   secondary?: { label: string; icon: typeof Play; onClick: () => void };
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
-  const { title, detail, primary, secondary, onDuplicate, onDelete } = props;
+  const { title, detail, attention, primary, secondary, onDuplicate, onDelete } = props;
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h3 className="truncate font-medium">{title}</h3>
           <p className="text-sm text-muted-foreground">{detail}</p>
+          {attention && <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{attention}</p>}
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={primary.onClick} className="flex-1 sm:flex-none">
@@ -143,6 +147,7 @@ export function HomePage() {
               key={r.id}
               title={r.name}
               detail={`${r.sources.length} source${r.sources.length === 1 ? '' : 's'} · updated ${formatDate(r.updatedAt)}`}
+              attention={hasProblems(checkRecipe(r)) ? 'Not finished: open it to see what is missing.' : undefined}
               primary={{ label: 'Generate', icon: Play, onClick: () => go({ page: 'generate', recipeId: r.id }) }}
               secondary={{ label: 'Edit', icon: Pencil, onClick: () => go({ page: 'recipe', recipeId: r.id }) }}
               onDuplicate={() => void duplicate('recipe', r.id)}
