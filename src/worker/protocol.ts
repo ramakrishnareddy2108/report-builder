@@ -1,6 +1,7 @@
 // Messages between the page and the worker. Each request has an id; the
 // worker answers with any number of progress messages, then one result or error.
 
+import type { CollectNamesRequest, CollectNamesResult } from './tasks/collectNames';
 import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
 
 export type TaskProgress = {
@@ -14,6 +15,7 @@ export type TaskProgress = {
 /** Every task the worker knows: request payload → result. */
 export type TaskMap = {
   readFile: { request: ReadFileRequest; result: ReadFileResult };
+  collectNames: { request: CollectNamesRequest; result: CollectNamesResult };
 };
 export type TaskName = keyof TaskMap;
 

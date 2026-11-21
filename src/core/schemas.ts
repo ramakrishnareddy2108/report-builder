@@ -4,6 +4,7 @@
 // when a persisted shape changes incompatibly.
 
 import { z } from 'zod';
+import { normaliseLabel } from './doctors';
 import { getMeasure } from './measures';
 import {
   COST_MEASURE_CODES,
@@ -17,6 +18,7 @@ import {
   type FactRow,
   type FieldMapping,
   type MeasureRule,
+  type NameGroup,
   type RuleTerm,
   type RunInfo,
   type SourceMapping,
@@ -105,8 +107,35 @@ export const DoctorMasterSchema = z.object({
   aliases: z.array(z.string()),
 });
 
+export const NameGroupSchema = z.object({ name: NonEmpty, aliases: z.array(z.string()) });
+
+/** Departments or sponsors: each name or alias belongs to one group only. */
+function addGroupIssues(ctx: z.RefinementCtx, groups: readonly NameGroup[], path: string, label: string): void {
+  const owner = new Map<string, string>();
+  groups.forEach((g, i) => {
+    for (const name of [g.name, ...g.aliases]) {
+      const key = normaliseLabel(name);
+      const other = owner.get(key);
+      if (other !== undefined && other !== g.name) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `"${name}" is used by both ${label} "${other}" and "${g.name}"`,
+          path: [path, i],
+        });
+      }
+      owner.set(key, g.name);
+    }
+  });
+}
+
 export const DoctorsFileSchema = z
-  .object({ version, doctors: z.array(DoctorMasterSchema) })
+  .object({
+    version,
+    doctors: z.array(DoctorMasterSchema),
+    // Older files have no groups yet.
+    departments: z.array(NameGroupSchema).default([]),
+    sponsors: z.array(NameGroupSchema).default([]),
+  })
   .superRefine((file, ctx) => {
     addDuplicateIssues(ctx, file.doctors, (d) => d.id, 'doctors', 'doctor id');
     // An alias may belong to one doctor only, ignoring case and outer spaces.
@@ -125,6 +154,8 @@ export const DoctorsFileSchema = z
         owner.set(k, d.id);
       }
     });
+    addGroupIssues(ctx, file.departments, 'departments', 'department');
+    addGroupIssues(ctx, file.sponsors, 'sponsors', 'sponsor');
   });
 
 // ---------------------------------------------------------------------------
@@ -397,6 +428,7 @@ export type SchemaTypeChecks = [
   Assert<Same<z.infer<typeof FieldMappingSchema>, FieldMapping>>,
   Assert<Same<z.infer<typeof SourceMappingSchema>, SourceMapping>>,
   Assert<Same<z.infer<typeof DoctorMasterSchema>, DoctorMaster>>,
+  Assert<Same<z.infer<typeof NameGroupSchema>, NameGroup>>,
   Assert<Same<z.infer<typeof RuleTermSchema>, RuleTerm>>,
   Assert<Same<z.infer<typeof MeasureRuleSchema>, MeasureRule>>,
   Assert<Same<z.infer<typeof CostEntrySchema>, CostEntry>>,

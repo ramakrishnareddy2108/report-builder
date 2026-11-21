@@ -57,3 +57,14 @@ export function consultationsWorkbook(opts: { withoutCachedValue?: boolean } = {
     Offset: offsetSheet(),
   });
 }
+
+/** A HIS-style sheet: two title rows, header on row 3, data from row 4. */
+export function hisSheet(header: string[], rows: (string | number | Date | null)[][]): XLSX.WorkSheet {
+  return XLSX.utils.aoa_to_sheet([['G2 Health Care'], ['Report 01-Oct-2026 To 31-Oct-2026'], header, ...rows], { cellDates: true });
+}
+
+/** A File holding a HIS-style workbook. */
+export function hisFile(name: string, header: string[], rows: (string | number | Date | null)[][], sheet = 'Sheet1'): File {
+  const bytes = buildWorkbook({ [sheet]: hisSheet(header, rows) });
+  return new File([bytes as Uint8Array<ArrayBuffer>], name);
+}

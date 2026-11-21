@@ -29,7 +29,7 @@ type SettingsState = {
 };
 
 const emptySources = (): SourcesFile => ({ version: SCHEMA_VERSION, sources: [] });
-const emptyDoctors = (): DoctorsFile => ({ version: SCHEMA_VERSION, doctors: [] });
+const emptyDoctors = (): DoctorsFile => ({ version: SCHEMA_VERSION, doctors: [], departments: [], sponsors: [] });
 
 export const useSettings = create<SettingsState>()((set, get) => {
   const requireWorkspace = (): Workspace => {

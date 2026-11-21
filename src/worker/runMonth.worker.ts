@@ -3,6 +3,7 @@
 
 import { WorkbookReadError } from '@/excel/readWorkbook';
 import type { TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
+import { collectNamesTask } from './tasks/collectNames';
 import { readFileTask } from './tasks/readFile';
 
 type WorkerScope = {
@@ -26,6 +27,8 @@ scope.addEventListener('message', (e) => {
     switch (req.task) {
       case 'readFile':
         return readFileTask(req.payload, progress);
+      case 'collectNames':
+        return collectNamesTask(req.payload, progress);
     }
   };
 

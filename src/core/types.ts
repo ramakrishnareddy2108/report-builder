@@ -147,6 +147,14 @@ export type DoctorMaster = {
   aliases: string[];
 };
 
+/** A department or sponsor with the other spellings that mean the same thing. */
+export type NameGroup = {
+  /** Name shown in reports. */
+  name: string;
+  /** Other spellings found in the HIS files. */
+  aliases: string[];
+};
+
 /** Doctor used for OP pharmacy rows that cannot be attributed. */
 export const UNATTRIBUTED_DOCTOR_ID = 'pharmacy-unattributed';
 export const UNATTRIBUTED_DOCTOR_NAME = 'Pharmacy – Unattributed';
