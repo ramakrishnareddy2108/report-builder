@@ -151,6 +151,12 @@ describe('suggestDoctors', () => {
     expect(chooseDisplayName([raw('Dr', 1)])).toBe('Dr'); // never an empty name
   });
 
+  it('keeps (REVIEW) in the display name, so accepting both gives two distinguishable doctors', () => {
+    const out = suggestDoctors([raw('K.Krishna Chand', 5), raw('K.KRISHNA CHAND (REVIEW)', 2)], []);
+    expect(out.map((s) => s.displayName)).toEqual(['K.Krishna Chand', 'K.KRISHNA CHAND (REVIEW)']);
+    expect(new DoctorMatcher(acceptSuggestions([], out)).conflicts).toEqual([]);
+  });
+
   it('flags (REVIEW) variants and points to a plain-name group', () => {
     const out = suggestDoctors(names, master, resolver);
     const review = out.find((s) => s.key === 'K KRISHNA CHAND (REVIEW)');

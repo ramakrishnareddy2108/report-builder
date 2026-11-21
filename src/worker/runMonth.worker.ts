@@ -5,6 +5,7 @@ import { WorkbookReadError } from '@/excel/readWorkbook';
 import type { TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import { collectNamesTask } from './tasks/collectNames';
 import { readFileTask } from './tasks/readFile';
+import { runMonthTask } from './tasks/runMonth';
 
 type WorkerScope = {
   postMessage(message: WorkerResponse): void;
@@ -15,7 +16,7 @@ const scope = self as unknown as WorkerScope;
 function plainMessage(err: unknown): string {
   if (err instanceof WorkbookReadError) return err.message;
   const detail = err instanceof Error ? err.message : String(err);
-  return `Something went wrong while reading the file. (${detail})`;
+  return `Something went wrong while processing the files. (${detail})`;
 }
 
 scope.addEventListener('message', (e) => {
@@ -29,6 +30,8 @@ scope.addEventListener('message', (e) => {
         return readFileTask(req.payload, progress);
       case 'collectNames':
         return collectNamesTask(req.payload, progress);
+      case 'runMonth':
+        return runMonthTask(req.payload, progress);
     }
   };
 

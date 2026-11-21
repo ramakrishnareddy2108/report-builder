@@ -2,7 +2,9 @@
 // worker answers with any number of progress messages, then one result or error.
 
 import type { CollectNamesRequest, CollectNamesResult } from './tasks/collectNames';
+import type { RunOutput } from '@/core/runMonth';
 import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
+import type { RunMonthRequest } from './tasks/runMonth';
 
 export type TaskProgress = {
   /** Short plain-language step, e.g. "Reading rows". */
@@ -16,6 +18,7 @@ export type TaskProgress = {
 export type TaskMap = {
   readFile: { request: ReadFileRequest; result: ReadFileResult };
   collectNames: { request: CollectNamesRequest; result: CollectNamesResult };
+  runMonth: { request: RunMonthRequest; result: RunOutput };
 };
 export type TaskName = keyof TaskMap;
 

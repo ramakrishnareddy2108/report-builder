@@ -191,11 +191,15 @@ function mostFrequent(counts: ReadonlyMap<string, number>): string | null {
   return best;
 }
 
-/** Display name for a group: the most common spelling without a suffix, tidied. */
+/**
+ * Display name for a group: the most common spelling, tidied, without a leading
+ * "Dr". A "(REVIEW)" suffix stays, so a review group never shares a name with the
+ * plain doctor (two doctors with one name could not be told apart when matching).
+ */
 export function chooseDisplayName(names: readonly RawName[]): string {
   const counts = new Map<string, number>();
   for (const n of names) {
-    const tidy = tidyName(n.raw.replace(SUFFIX, ''));
+    const tidy = tidyName(n.raw);
     const spelling = tidy.replace(LEADING_DR, '') || tidy; // "Dr." is not part of the name in reports
     counts.set(spelling, (counts.get(spelling) ?? 0) + n.count);
   }

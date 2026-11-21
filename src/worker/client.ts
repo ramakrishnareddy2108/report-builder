@@ -2,7 +2,9 @@
 
 import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import type { CollectNamesRequest, CollectNamesResult } from './tasks/collectNames';
+import type { RunOutput } from '@/core/runMonth';
 import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
+import type { RunMonthRequest } from './tasks/runMonth';
 
 type Pending = {
   resolve: (result: unknown) => void;
@@ -67,4 +69,8 @@ export function collectNamesInWorker(
   onProgress?: (p: TaskProgress) => void,
 ): Promise<CollectNamesResult> {
   return runTask('collectNames', request, onProgress);
+}
+
+export function runMonthInWorker(request: RunMonthRequest, onProgress?: (p: TaskProgress) => void): Promise<RunOutput> {
+  return runTask('runMonth', request, onProgress);
 }
