@@ -23,7 +23,10 @@ type NameRow = { name: string; count: number; spellings: string[] };
 function RuleCard({ index, report, running }: { index: number; report: CleanupReport | undefined; running: boolean }) {
   const rule = useBuilder((s) => s.recipe?.cleanup[index]);
   const update = useBuilder((s) => s.update);
-  const columns = useBuilder((s) => (s.recipe ? combinedColumns(s.recipe).filter((c) => c.type === 'text') : []));
+  // Select the stored recipe (a stable reference) and derive the list here. A selector that builds a new
+  // array on every call makes zustand 5 re-render forever ("Maximum update depth exceeded").
+  const recipe = useBuilder((s) => s.recipe);
+  const columns = useMemo(() => (recipe ? combinedColumns(recipe).filter((c) => c.type === 'text') : []), [recipe]);
   const [selected, setSelected] = useState<string[]>([]);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [target, setTarget] = useState('');
