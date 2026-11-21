@@ -59,12 +59,28 @@ export function consultationsWorkbook(opts: { withoutCachedValue?: boolean } = {
 }
 
 /** A HIS-style sheet: two title rows, header on row 3, data from row 4. */
-export function hisSheet(header: string[], rows: (string | number | Date | null)[][]): XLSX.WorkSheet {
-  return XLSX.utils.aoa_to_sheet([['G2 Health Care'], ['Report 01-Oct-2026 To 31-Oct-2026'], header, ...rows], { cellDates: true });
+export function hisSheet(header: readonly string[], rows: readonly (readonly unknown[])[]): XLSX.WorkSheet {
+  const aoa = [['G2 Health Care'], ['Report 01-Oct-2026 To 31-Oct-2026'], [...header], ...rows.map((r) => [...r])] as unknown[][];
+  return XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
 }
 
 /** A File holding a HIS-style workbook. */
 export function hisFile(name: string, header: string[], rows: (string | number | Date | null)[][], sheet = 'Sheet1'): File {
   const bytes = buildWorkbook({ [sheet]: hisSheet(header, rows) });
+  return new File([bytes as Uint8Array<ArrayBuffer>], name);
+}
+
+/** A workbook with one HIS-shaped sheet (plus any extra sheets by name). */
+export function hisWorkbook(
+  sheetName: string,
+  headers: readonly string[],
+  rows: readonly (readonly unknown[])[],
+  extra: Record<string, XLSX.WorkSheet> = {},
+): Uint8Array {
+  return buildWorkbook({ [sheetName]: hisSheet(headers, rows), ...extra });
+}
+
+/** Wrap bytes as a File (for worker tasks that take uploads). */
+export function asFile(bytes: Uint8Array, name: string): File {
   return new File([bytes as Uint8Array<ArrayBuffer>], name);
 }

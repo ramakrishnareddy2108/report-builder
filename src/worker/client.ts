@@ -1,6 +1,7 @@
 // Page-side wrapper around the worker: one shared worker, promise per task.
 
 import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
+import type { CombineRequest, CombineTaskResult } from './tasks/combine';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 type Pending = {
@@ -56,4 +57,8 @@ export function runTask<K extends TaskName>(
 
 export function inspectFileInWorker(request: InspectFileRequest, onProgress?: (p: TaskProgress) => void): Promise<InspectFileResult> {
   return runTask('inspectFile', request, onProgress);
+}
+
+export function combineInWorker(request: CombineRequest, onProgress?: (p: TaskProgress) => void): Promise<CombineTaskResult> {
+  return runTask('combine', request, onProgress);
 }
