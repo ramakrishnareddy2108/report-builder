@@ -31,8 +31,8 @@ export function evaluate(node: Node, ctx: FormulaContext): Value {
     case 'call': {
       const def = FUNCTIONS[node.name];
       if (!def) throw new FormulaError('#NAME?', `Unknown function ${node.name}`);
-      if (def.lazy) return def.fn(node.args.map((a): Thunk => () => evaluate(a, ctx)));
-      return def.fn(node.args.map((a) => evaluate(a, ctx)));
+      if (def.lazy) return def.fn(node.args.map((a): Thunk => () => evaluate(a, ctx)), ctx);
+      return def.fn(node.args.map((a) => evaluate(a, ctx)), ctx);
     }
   }
 }

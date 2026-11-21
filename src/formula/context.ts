@@ -2,7 +2,14 @@
 // then as an Excel column letter ([F], [AH]).
 
 import { columnIndex } from '@/excel/detectHeader';
-import type { FormulaContext, Value } from './types';
+import type { FormulaContext, FormulaParams, Value } from './types';
+
+/** Looks a parameter up by name, ignoring case. */
+function paramLookup(params: FormulaParams | undefined): FormulaContext['getParam'] {
+  if (!params) return undefined;
+  const folded = new Map(Object.entries(params).map(([k, v]) => [k.toUpperCase(), v] as const));
+  return (name) => folded.get(name.toUpperCase());
+}
 
 export class ColumnIndex {
   private readonly exact = new Map<string, number>();
@@ -26,8 +33,8 @@ export class ColumnIndex {
   }
 
   /** A formula context over one row (cells in column order). */
-  forRow(row: readonly Value[]): FormulaContext {
-    return { getColumn: (name) => this.read(row, name) };
+  forRow(row: readonly Value[], params?: FormulaParams): FormulaContext {
+    return { getColumn: (name) => this.read(row, name), getParam: paramLookup(params) };
   }
 
   private read(row: readonly Value[], name: string): Value | undefined {
@@ -37,6 +44,6 @@ export class ColumnIndex {
 }
 
 /** A context from named values, for rules that refer to field keys like [grossAmount]. */
-export function recordContext(values: Readonly<Record<string, Value>>): FormulaContext {
-  return { getColumn: (name) => (Object.hasOwn(values, name) ? values[name] : undefined) };
+export function recordContext(values: Readonly<Record<string, Value>>, params?: FormulaParams): FormulaContext {
+  return { getColumn: (name) => (Object.hasOwn(values, name) ? values[name] : undefined), getParam: paramLookup(params) };
 }

@@ -1,16 +1,16 @@
 // The function registry. Eager functions get evaluated arguments; lazy ones
 // (IF, IFS, IFERROR, AND, OR) get thunks and evaluate only what they need.
 
-import { toDateParts } from '@/core/dates';
+import { toDateParts, type DateParts } from '@/core/dates';
 import { checkNumber, clean, isBlank, parseNumberText, toBool, toNumber, toText } from './coerce';
-import { FormulaError, type Value } from './types';
+import { FormulaError, type FormulaContext, type Value } from './types';
 
 export type Thunk = () => Value;
 
 type Common = { min: number; max: number };
 export type FunctionDef =
-  | (Common & { lazy?: false; fn: (args: Value[]) => Value })
-  | (Common & { lazy: true; fn: (args: Thunk[]) => Value });
+  | (Common & { lazy?: false; fn: (args: Value[], ctx: FormulaContext) => Value })
+  | (Common & { lazy: true; fn: (args: Thunk[], ctx: FormulaContext) => Value });
 
 const MANY = Number.POSITIVE_INFINITY;
 
@@ -48,6 +48,28 @@ function searchIn(find: string, within: string, start: number): number {
   const at = within.toLowerCase().indexOf(find.toLowerCase(), start - 1);
   if (at === -1) throw new FormulaError('#VALUE!', `"${find}" was not found in the text`);
   return at + 1;
+}
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DATE_TOKENS = /YYYY|YY|MMMM|MMM|MM|DD/gi;
+
+/** Formats a date with YYYY, YY, MMMM, MMM, MM and DD (any letter case), e.g. "MMM-YYYY" gives "Oct-2026". */
+function formatDate(parts: DateParts, format: string): string {
+  if (format.search(DATE_TOKENS) === -1) {
+    throw new FormulaError('#VALUE!', `The date format "${format}" is not understood. Use YYYY, MMM, MM and DD, for example "MMM-YYYY".`);
+  }
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return format.replace(DATE_TOKENS, (token) => {
+    switch (token.toUpperCase()) {
+      case 'YYYY': return pad(parts.year, 4);
+      case 'YY': return pad(parts.year % 100);
+      case 'MMMM': return MONTH_LONG[parts.month - 1] ?? '';
+      case 'MMM': return MONTH_SHORT[parts.month - 1] ?? '';
+      case 'MM': return pad(parts.month);
+      default: return pad(parts.day);
+    }
+  });
 }
 
 const properCase = (s: string) => s.toLowerCase().replace(/(^|[^\p{L}\p{N}])(\p{L})/gu, (_, sep: string, c: string) => sep + c.toUpperCase());
@@ -155,6 +177,7 @@ export const FUNCTIONS: Readonly<Record<string, FunctionDef>> = {
   },
   SEARCH: { min: 2, max: 3, fn: ([find, within, start]) => searchIn(toText(find as Value), toText(within as Value), count(start, 1)) },
   CONTAINS: { min: 2, max: 2, fn: ([within, find]) => toText(within as Value).toLowerCase().includes(toText(find as Value).toLowerCase()) },
+  STARTSWITH: { min: 2, max: 2, fn: ([s, prefix]) => toText(s as Value).toLowerCase().startsWith(toText(prefix as Value).toLowerCase()) },
 
   // checks
   ISBLANK: { min: 1, max: 1, fn: ([v]) => isBlank(v as Value) },
@@ -171,7 +194,29 @@ export const FUNCTIONS: Readonly<Record<string, FunctionDef>> = {
     },
   },
 
+  // recipe parameters
+  PARAM: {
+    min: 1,
+    max: 1,
+    fn: ([name], ctx) => {
+      const key = toText(name as Value);
+      const v = ctx.getParam?.(key);
+      if (v === undefined) throw new FormulaError('#REF!', `The parameter "${key}" was not found. Add it at the top of the recipe.`);
+      return v;
+    },
+  },
+
   // dates
+  TEXT: {
+    min: 2,
+    max: 2,
+    fn: ([date, format]) => {
+      if (date === null || (typeof date === 'string' && date.trim() === '')) return '';
+      const parts = toDateParts(date as Value);
+      if (!parts) throw new FormulaError('#VALUE!', `"${toText(date as Value)}" is not a date`);
+      return formatDate(parts, toText(format as Value));
+    },
+  },
   YEAR: { min: 1, max: 1, fn: ([v]) => datePart(v as Value, 'year') },
   MONTH: { min: 1, max: 1, fn: ([v]) => datePart(v as Value, 'month') },
   DAY: { min: 1, max: 1, fn: ([v]) => datePart(v as Value, 'day') },

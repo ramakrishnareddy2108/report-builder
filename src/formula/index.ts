@@ -12,7 +12,7 @@ import { FormulaError, FormulaSyntaxError, type FormulaContext, type Node, type 
 export { toBool } from './coerce';
 export { ColumnIndex, recordContext } from './context';
 export { FormulaError, FormulaSyntaxError } from './types';
-export type { FormulaContext, Value } from './types';
+export type { FormulaContext, FormulaParams, Value } from './types';
 
 export type CompiledFormula = {
   text: string;

@@ -19,7 +19,12 @@ export type Node =
 export interface FormulaContext {
   /** The value of `[name]`, or undefined when no such column exists. */
   getColumn(name: string): Value | undefined;
+  /** The value of a recipe parameter for PARAM("name"), or undefined when there is no such parameter. */
+  getParam?(name: string): Value | undefined;
 }
+
+/** Recipe parameters by name, for example { Month: "Oct-2026" }. */
+export type FormulaParams = Readonly<Record<string, Value>>;
 
 export type FormulaErrorCode = '#DIV/0!' | '#VALUE!' | '#NAME?' | '#REF!' | '#N/A' | '#NUM!';
 
