@@ -9,6 +9,7 @@ import { openWorkbook } from '@/excel/readWorkbook';
 import type { Recipe } from '@/recipe/schema';
 import type * as XLSX from 'xlsx';
 import type { TaskProgress } from '../protocol';
+import { setLastCombined } from '../state';
 
 export type CombineRequest = {
   recipe: Recipe;
@@ -61,6 +62,7 @@ export async function combineTask(req: CombineRequest, onProgress: Progress = ()
   const combined = combine(readings, recipe, req.params);
   issues.push(...readings.flatMap((r) => r.result.errors), ...combined.issues);
 
+  setLastCombined(combined.table);
   const rows = req.maxRows === undefined ? combined.table.rows : combined.table.rows.slice(0, req.maxRows);
   onProgress({ stage: 'Done', fraction: 1 });
   return {

@@ -14,6 +14,7 @@ import { openWorkbook } from '@/excel/readWorkbook';
 import type { Recipe } from '@/recipe/schema';
 import type * as XLSX from 'xlsx';
 import type { TaskProgress } from '../protocol';
+import { getLastCombined, setLastCombined } from '../state';
 
 export type GenerateRequest = {
   recipe: Recipe;
@@ -38,8 +39,6 @@ export type GenerateTaskResult = {
 
 const PREVIEW_ROWS = 200;
 
-let lastCombined: CombinedTable | null = null;
-
 export async function generateTask(req: GenerateRequest, onProgress: (p: TaskProgress) => void = () => {}): Promise<GenerateTaskResult> {
   const workbooks = new Map<File, XLSX.WorkBook>();
   const files: { sourceId: string; fileName: string; workbook: XLSX.WorkBook }[] = [];
@@ -54,7 +53,7 @@ export async function generateTask(req: GenerateRequest, onProgress: (p: TaskPro
   }
 
   const result = await generate({ recipe: req.recipe, params: req.params, files }, (p) => onProgress({ ...p, fraction: 0.1 + p.fraction * 0.9 }));
-  lastCombined = result.combined;
+  setLastCombined(result.combined);
   return {
     canDownload: result.canDownload,
     report: result.report,
@@ -71,6 +70,7 @@ export async function generateTask(req: GenerateRequest, onProgress: (p: TaskPro
 
 /** The combined table of the last generate, as an Excel file. */
 export async function exportCombinedTask(): Promise<Uint8Array> {
-  if (!lastCombined) throw new Error('There is no combined data yet. Click Generate first.');
-  return combinedWorkbookBytes(lastCombined);
+  const table = getLastCombined();
+  if (!table) throw new Error('There is no combined data yet. Run the preview or click Generate first.');
+  return combinedWorkbookBytes(table);
 }
