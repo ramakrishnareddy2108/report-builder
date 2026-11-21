@@ -20,6 +20,18 @@ export const SOURCE_IDS = [
 ] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 
+/** Names shown to the user. */
+export const SOURCE_LABELS: Readonly<Record<SourceId, string>> = {
+  ipAdmissions: 'IP Admissions',
+  ipDischarge: 'IP Discharge',
+  ipGeneralBill: 'IP General Bill Breakup',
+  ipBillBreakups: 'IP Bill Breakups',
+  opBilling: 'OP Billing',
+  opConsultations: 'OP Consultations',
+  opPharmacySales: 'OP Pharmacy Sales',
+  opReturns: 'OP Returns',
+};
+
 /**
  * Logical fields a source can provide. Rules refer to these keys (for example
  * `[grossAmount] - [concession]`), never to raw header text, so a renamed
