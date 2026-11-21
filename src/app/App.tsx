@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PAGE_COMPONENTS } from '@/pages';
@@ -6,11 +7,17 @@ import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { useAppStore } from './store';
 import { UnsupportedBrowser } from './UnsupportedBrowser';
+import { restoreWorkspace } from './workspaceSession';
 
 export function App() {
   const page = useAppStore((s) => s.page);
+  const supported = isFileSystemAccessSupported();
 
-  if (!isFileSystemAccessSupported()) return <UnsupportedBrowser />;
+  useEffect(() => {
+    if (supported) void restoreWorkspace();
+  }, [supported]);
+
+  if (!supported) return <UnsupportedBrowser />;
 
   const Page = PAGE_COMPONENTS[page];
 

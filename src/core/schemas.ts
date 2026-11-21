@@ -357,6 +357,20 @@ export const DashboardsFileSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// backup-info.json (root of a backup zip)
+// ---------------------------------------------------------------------------
+
+export const BACKUP_APP_ID = 'drr-report-builder' as const;
+
+export const BackupManifestSchema = z.object({
+  version,
+  app: z.literal(BACKUP_APP_ID),
+  createdAt: IsoDateTime,
+  workspaceName: z.string(),
+  files: z.array(NonEmpty),
+});
+
+// ---------------------------------------------------------------------------
 // Inferred file types
 // ---------------------------------------------------------------------------
 
@@ -370,6 +384,7 @@ export type ChecksFile = z.infer<typeof ChecksFileSchema>;
 export type RunInfoFile = z.infer<typeof RunInfoSchema>;
 export type SettingsUsedFile = z.infer<typeof SettingsUsedFileSchema>;
 export type DashboardsFile = z.infer<typeof DashboardsFileSchema>;
+export type BackupManifest = z.infer<typeof BackupManifestSchema>;
 
 // ---------------------------------------------------------------------------
 // Compile-time check: schemas and the hand-written types in types.ts agree.
