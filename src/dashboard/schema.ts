@@ -17,6 +17,11 @@ export const TileSchema = z.object({
   type: TileTypeSchema,
   x: z.string().optional(),
   y: z.object({ column: nonEmpty, agg: TileAggSchema }),
+  /**
+   * Added to the schema in CLAUDE.md (optional, so older templates stay valid): more measures drawn as extra series
+   * next to `y`, for example IP Revenue, OP Revenue and OP Pharmacy stacked for each department.
+   */
+  extraY: z.array(z.object({ column: nonEmpty, agg: TileAggSchema })).optional(),
   splitBy: z.string().optional(),
   /** Formula over the data rows. */
   filter: z.string().optional(),

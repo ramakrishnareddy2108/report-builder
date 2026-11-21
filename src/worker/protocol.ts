@@ -5,6 +5,9 @@ import type { CombineRequest, CombineTaskResult } from './tasks/combine';
 import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { PreviewRequest, PreviewResult } from './tasks/preview';
 import type { InspectTemplateRequest, InspectTemplateResult } from './tasks/inspectTemplate';
+import type { DashboardData } from '@/dashboard/data';
+import type { TableExportInput } from '@/excel/tableSheet';
+import type { ReadOutputsRequest } from './tasks/dashboardTasks';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 export type TaskProgress = {
@@ -20,6 +23,8 @@ export type TaskMap = {
   inspectFile: { request: InspectFileRequest; result: InspectFileResult };
   combine: { request: CombineRequest; result: CombineTaskResult };
   inspectTemplate: { request: InspectTemplateRequest; result: InspectTemplateResult };
+  readOutputs: { request: ReadOutputsRequest; result: DashboardData };
+  exportTable: { request: TableExportInput; result: Uint8Array };
   preview: { request: PreviewRequest; result: PreviewResult };
   generate: { request: GenerateRequest; result: GenerateTaskResult };
   exportCombined: { request: null; result: Uint8Array };

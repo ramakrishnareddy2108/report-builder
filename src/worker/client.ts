@@ -5,6 +5,9 @@ import type { CombineRequest, CombineTaskResult } from './tasks/combine';
 import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { PreviewRequest, PreviewResult } from './tasks/preview';
 import type { InspectTemplateRequest, InspectTemplateResult } from './tasks/inspectTemplate';
+import type { DashboardData } from '@/dashboard/data';
+import type { TableExportInput } from '@/excel/tableSheet';
+import type { ReadOutputsRequest } from './tasks/dashboardTasks';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 type Pending = {
@@ -83,4 +86,14 @@ export function previewInWorker(request: PreviewRequest, onProgress?: (p: TaskPr
 /** Where the report would go in an Excel template, and how its columns map. */
 export function inspectTemplateInWorker(request: InspectTemplateRequest): Promise<InspectTemplateResult> {
   return runTask('inspectTemplate', request);
+}
+
+/** Saved report files → the rows a dashboard draws. */
+export function readOutputsInWorker(request: ReadOutputsRequest): Promise<DashboardData> {
+  return runTask('readOutputs', request);
+}
+
+/** A dashboard tile's table as Excel bytes. */
+export function exportTableInWorker(request: TableExportInput): Promise<Uint8Array> {
+  return runTask('exportTable', request);
 }

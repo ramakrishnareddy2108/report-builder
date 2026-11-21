@@ -20,6 +20,9 @@ import { bytesToBase64 } from '@/lib/base64';
 import { starterRecipes } from '@/recipe/defaults';
 import type { Recipe } from '@/recipe/schema';
 import { inspectFileTask } from '@/worker/tasks/inspectFile';
+import { readOutputFile, stackData } from '@/dashboard/data';
+import { starterDashboards } from '@/dashboard/defaults';
+import { computeTile } from '@/dashboard/tiles';
 
 const DIR = 'samples/2026-10';
 const present = existsSync(DIR);
@@ -105,6 +108,22 @@ describe.skipIf(!present)('golden: October 2026 with the starter recipes', () =>
         }
         expect(result.checks.filter((c) => c.level === 'error')).toEqual([]);
         expect(result.workbookBytes?.length ?? 0).toBeGreaterThan(0);
+      }, 120_000);
+
+      it('feeds the dashboard: the saved report reads back, and the KPIs equal the report totals', async () => {
+        if (recipe.id !== 'starter-drr') return;
+        const r = await run(recipe);
+        const report = r.result.report!;
+        const saved = readOutputFile(r.result.workbookBytes as Uint8Array, { fileName: 'DRR_Oct-2026.xlsx', recipe });
+        expect(saved.rows.length, 'every report row is read back').toBe(report.rows.length);
+        // a second month: the same report relabelled, so the comparison tiles have something to compare
+        const sep = { ...saved, rows: saved.rows.map((row) => ({ ...row, Month: 'Sep-2026', _file: 'DRR_Sep-2026.xlsx' })) };
+        const both = stackData([sep, saved]);
+        const [dash] = starterDashboards();
+        for (const t of dash!.tiles) expect(computeTile(t, both).status, t.title).toBe('ok');
+        const kpi = computeTile(dash!.tiles[0]!, both) as { value: number; previous: number; change: number };
+        expect(Math.round(kpi.value * 100)).toBe(report.totals?.['Total Revenue']);
+        expect(kpi.change).toBe(0);
       }, 120_000);
 
       it('compares with a filled report in expected/ when there is one (prints the differences)', async () => {

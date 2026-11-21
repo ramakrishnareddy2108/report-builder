@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import type { DashboardTemplate } from '@/dashboard/schema';
 import { downloadFile } from '@/lib/download';
 import { buildLibraryFile, libraryFileName, type ImportPlan } from '@/recipe/importExport';
+import { starterDashboards } from '@/dashboard/defaults';
 import { starterRecipes } from '@/recipe/defaults';
 import { createLibrary, idbStore, type Library } from '@/recipe/library';
 import type { Recipe } from '@/recipe/schema';
@@ -99,6 +100,8 @@ export const useLibrary = create<LibraryState>()((set, get) => {
       const have = new Set(get().recipes.map((r) => r.id));
       const missing = starterRecipes().filter((r) => !have.has(r.id));
       for (const r of missing) await change(() => lib().saveRecipe(r));
+      const haveDash = new Set(get().dashboards.map((d) => d.id));
+      for (const d of starterDashboards().filter((x) => !haveDash.has(x.id))) await change(() => lib().saveDashboard(d));
       return missing.length;
     },
     exportLibrary: () => {
