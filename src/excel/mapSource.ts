@@ -46,6 +46,19 @@ export type ResolvedMapping = {
   problems: MappingProblem[];
 };
 
+/**
+ * Headers of columns that hold patient details. Names, phone numbers and addresses are never read
+ * into the app, so a mapping may not point at them (a doctor, a bill number and so on are fine).
+ */
+const PATIENT_COLUMN = /patient|mobile|phone|address|contact|guardian|relative|aadha+r/i;
+
+export function isPatientColumn(header: string): boolean {
+  return PATIENT_COLUMN.test(header);
+}
+
+const patientProblem = (column: string): string =>
+  `The column “${column}” holds patient details. Patient names, phone numbers and addresses are never used or stored; choose another column.`
+
 /** Column position for a column mapping, or null when the file has no such column. */
 function locateColumn(
   m: Extract<SourceMapping['fields'][FieldKey], { type: 'column' }>,
@@ -101,6 +114,11 @@ export function resolveMapping(
   const compile = (text: string, field: FieldKey | 'rowFilter', what: string): CompiledFormula | null => {
     try {
       const formula = compileFormula(text);
+      const patient = formula.columns.map((c) => header.headers[columns.find(c) ?? -1] ?? '').find(isPatientColumn);
+      if (patient) {
+        problems.push({ field, message: patientProblem(patient), missingColumns: [] });
+        return null;
+      }
       const missing = missingFormulaColumns(formula, columns);
       if (missing.length > 0) {
         problems.push({
@@ -120,7 +138,9 @@ export function resolveMapping(
   for (const [key, m] of Object.entries(mapping.fields) as [FieldKey, NonNullable<SourceMapping['fields'][FieldKey]>][]) {
     if (m.type === 'column') {
       const index = locateColumn(m, header);
-      if (index === null) {
+      if (index !== null && isPatientColumn(header.rawHeaders[index] ?? '')) {
+        problems.push({ field: key, message: patientProblem(header.rawHeaders[index] as string), missingColumns: [] });
+      } else if (index === null) {
         problems.push({
           field: key,
           message: `${describeColumn(m)} was not found in this file (needed for ${key}).`,

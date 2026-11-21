@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FIELD_KINDS, FIELD_LABELS, type FieldKey, type FieldMapping } from '@/core/types';
-import { columnLabel, columnMappingAt, type MappingProblem, type ResolvedField, type SheetHeader } from '@/excel/mapSource';
+import { columnLabel, columnMappingAt, isPatientColumn, type MappingProblem, type ResolvedField, type SheetHeader } from '@/excel/mapSource';
 import { FormulaInput } from './FormulaInput';
 
 type Mode = FieldMapping['type'];
@@ -79,9 +79,10 @@ export function FieldRow({ field, mapping, resolved, header, problems, required,
                 <SelectValue placeholder="Choose a column" />
               </SelectTrigger>
               <SelectContent>
-                {header.rawHeaders.map((_, i) => (
-                  <SelectItem key={i} value={String(i)}>
+                {header.rawHeaders.map((h, i) => (
+                  <SelectItem key={i} value={String(i)} disabled={isPatientColumn(h)}>
                     {columnLabel(header.rawHeaders, i)}
+                    {isPatientColumn(h) && ' (patient details, not allowed)'}
                   </SelectItem>
                 ))}
               </SelectContent>

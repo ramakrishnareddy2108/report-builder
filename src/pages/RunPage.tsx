@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { countByLevel } from '@/core/checks';
 import { doctorReport, sponsorReport } from '@/core/report';
+import { useUnsavedWarning } from '@/lib/useUnsavedWarning';
 import type { Workspace } from '@/storage/workspace';
 
 export function RunPage() {
@@ -63,6 +64,7 @@ function RunWorkspace({ ws }: { ws: Workspace }) {
   const infos = useSourceInfos();
   const [pendingMonth, setPendingMonth] = useState<string | null>(null);
   const unsaved = useRun((s) => s.result !== null && s.result.saved === null);
+  useUnsavedWarning(unsaved);
 
   useEffect(() => {
     void refreshMonth(ws, month);

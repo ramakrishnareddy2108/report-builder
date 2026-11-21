@@ -4,7 +4,7 @@ import { requiredFields } from '@/core/rules';
 import { loadDefaultRules } from '@/core/defaults';
 import { SOURCE_IDS, type SourceMapping } from '@/core/types';
 import { headersAt } from '@/excel/detectHeader';
-import { columnLabel, columnMappingAt, readMappedRows, resolveMapping } from '@/excel/mapSource';
+import { columnLabel, columnMappingAt, isPatientColumn, readMappedRows, resolveMapping } from '@/excel/mapSource';
 import type { Row } from '@/excel/readWorkbook';
 import { DEFAULT_SOURCE_SIGNATURES } from '@/excel/identifySource';
 
@@ -280,5 +280,51 @@ describe('columnMappingAt', () => {
   it('labels columns with their letter', () => {
     expect(columnLabel(raw, 0)).toBe('A · BILLNO');
     expect(columnLabel(raw, 2)).toBe('C · (no header)');
+  });
+});
+
+describe('patient details are never mapped', () => {
+  const patientHeader = ['BILLNO', 'PATIENTNAME', 'PATMOBILENO', 'ADDRESS', 'DOCTORNAME', 'Contact No', 'NETAMOUNT'];
+  const h = { rawHeaders: patientHeader, headers: patientHeader };
+
+  it.each(['PATIENTNAME', 'PATMOBILENO', 'ADDRESS', 'Contact No', 'GUARDIAN', 'AADHAR', 'Aadhaar No', 'Phone'])('%s is a patient column', (name) => {
+    expect(isPatientColumn(name)).toBe(true);
+  });
+
+  it.each(['DOCTORNAME', 'DEPARTMENTNAME', 'ORGANIZATIONNAME', 'ORGNAME', 'UMRNO', 'BILLNO', 'NETAMOUNT', 'REFERREDBY', 'USERNAME'])('%s is not', (name) => {
+    expect(isPatientColumn(name)).toBe(false);
+  });
+
+  it('refuses a field mapped to a patient column, by name or by letter', () => {
+    for (const field of [
+      { type: 'column', value: 'PATIENTNAME' } as const,
+      { type: 'column', value: 'C', by: 'letter' } as const,
+    ]) {
+      const r = resolveMapping(mapping({ fields: { ref: { type: 'column', value: 'BILLNO' }, doctor: field } }), h);
+      expect(r.problems).toHaveLength(1);
+      expect(r.problems[0]?.message).toMatch(/holds patient details.*never used or stored/);
+      expect(r.fields.doctor).toBeUndefined();
+    }
+  });
+
+  it('refuses a formula or a row filter that reads a patient column, so no patient text can reach a message or a fact', () => {
+    const r = resolveMapping(
+      mapping({
+        fields: { ref: { type: 'column', value: 'BILLNO' }, doctor: { type: 'formula', value: 'UPPER([PATIENTNAME])' } },
+        rowFilter: 'LEN([ADDRESS]) > 3',
+      }),
+      h,
+    );
+    expect(r.problems.map((p) => p.field).sort()).toEqual(['doctor', 'rowFilter']);
+    expect(r.fields.doctor).toBeUndefined();
+    expect(r.rowFilter).toBeNull();
+  });
+
+  it('none of the default mappings uses one', () => {
+    for (const m of DEFAULT_SOURCE_MAPPINGS) {
+      for (const f of Object.values(m.fields)) {
+        if (f?.type === 'column') expect(isPatientColumn(f.value), `${m.sourceId}: ${f.value}`).toBe(false);
+      }
+    }
   });
 });

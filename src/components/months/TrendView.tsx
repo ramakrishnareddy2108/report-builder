@@ -3,6 +3,7 @@ import { Suspense, lazy, useMemo, useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GROUP_LEVELS, LEVEL_LABELS, trend, type TrendLevel } from '@/core/history';
 import { MEASURES, getMeasure } from '@/core/measures';
+import { formatINR } from '@/core/money';
 import type { MeasureCode } from '@/core/types';
 import type { MonthOverview } from '@/storage/history';
 
@@ -104,7 +105,7 @@ export function TrendView({ overviews }: { overviews: readonly MonthOverview[] }
                   <td className="px-3 py-1.5">{s.name}</td>
                   {s.points.map((p, i) => (
                     <td key={i} className="px-3 py-1.5 text-right tabular-nums">
-                      {p === null ? '' : getMeasure(measure).kind === 'count' ? p : (p / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {p === null ? '' : getMeasure(measure).kind === 'count' ? p : formatINR(p, { symbol: false })}
                     </td>
                   ))}
                 </tr>

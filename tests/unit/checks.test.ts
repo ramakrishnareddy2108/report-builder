@@ -42,6 +42,7 @@ describe('the made-up month', () => {
       'pharmacy-attribution': 'Warning', // 2 Fallback + 1 Unattributed
       'op-overlap': 'Pass', // consultations are not added to OP revenue
       'dates-outside-month': 'Warning', // G4 is dated in November
+      'rows-without-number': 'Pass', // each file has at most its one total row
       'unreadable-other-cells': 'Pass',
       'change-vs-previous': 'Pass', // no previous Final month
       'ip-via-op-pharmacy': 'Pass',
@@ -170,6 +171,22 @@ describe('Fail checks', () => {
 });
 
 describe('Warning checks', () => {
+  it('warns when a file has more than its one total row without a number', () => {
+    const d = copy();
+    d.sources.find((s) => s.sourceId === 'opBilling')!.skipped.noReference = { count: 3, examples: [{ sourceFile: 'OP.xlsx', sourceRow: 9, ref: null }] };
+    const c = find(runChecks(input({}, d)), 'rows-without-number');
+    expect(c).toMatchObject({ level: 'Warning', rows: 3 });
+    expect(c.details).toEqual(['OP Billing: 3 rows']);
+  });
+
+  it('lists the rule terms that are switched off, so their rows are not forgotten', () => {
+    const c = find(runChecks(input()), 'rows-not-used');
+    expect(c.details?.some((l) => /OP_REVENUE from OP Consultations: switched off \(includeConsultations is off\)/.test(l))).toBe(true);
+    expect(c.message).toMatch(/1 rule term is switched off/);
+    const on = monthSettings({ flags: { includeConsultations: true } }).rules;
+    expect(find(runChecks(input({ rules: on })), 'rows-not-used').details?.some((l) => /switched off/.test(l))).toBe(false);
+  });
+
   it('warns when no costs were entered, and when costs belong to doctors who left the list', () => {
     expect(find(runChecks(input({ costs: [] })), 'costs-entered')).toMatchObject({ level: 'Warning' });
     expect(find(runChecks(input({ costs: [{ doctorId: DR_A, amounts: {} }] })), 'costs-entered').level).toBe('Warning'); // a note alone is not a cost
@@ -261,7 +278,7 @@ describe('making a run Final', () => {
   });
 
   it('counts checks by level', () => {
-    expect(countByLevel(checks())).toEqual({ Pass: 15, Warning: 3, Fail: 1 });
+    expect(countByLevel(checks())).toEqual({ Pass: 16, Warning: 3, Fail: 1 });
   });
 });
 

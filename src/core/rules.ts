@@ -194,7 +194,9 @@ class RuleRun {
       noDate: emptyCounted(),
     };
     this.terms.push(stat);
-    const reads = new Set<FieldKey>(valueFields(term));
+    // Fields the term reads, in its value or its filter: an unreadable amount in any of them
+    // would change the result, so such a row is counted and left out, never guessed at.
+    const reads = new Set<FieldKey>([...valueFields(term), ...fieldsInFormula(term.filter)]);
     const pharmacy = term.attribution === 'pharmacyByUmrno';
 
     for (const row of src.mapped.rows) {
@@ -244,10 +246,9 @@ class RuleRun {
     ctx: FormulaContext,
     reads: ReadonlySet<FieldKey>,
   ): { ok: true; paise: number } | { ok: false; detail: string } {
-    if (term.value.type === 'count') return { ok: true, paise: 1 };
-
     const bad = row.issues.find((i) => i.kind !== 'badDate' && reads.has(i.field as FieldKey));
     if (bad) return { ok: false, detail: bad.message };
+    if (term.value.type === 'count') return { ok: true, paise: 1 };
 
     if (term.value.type === 'field') {
       const v = row.values[term.value.field];

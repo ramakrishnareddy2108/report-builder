@@ -4,9 +4,9 @@ Small made-up Excel files for tests. **Never put real patient data here.**
 
 They are written by `scripts/make-fixtures.ts` from `tests/helpers/monthData.ts`:
 
-```
+```bash
 npx tsx scripts/make-fixtures.ts
-```
+```bash
 
 | Folder | What it holds |
 |---|---|

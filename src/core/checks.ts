@@ -9,6 +9,7 @@ import { formatINR } from './money';
 import type { RulesFile } from './schemas';
 import type { RunDiagnostics, RowExample, SourceDiag, TermStat } from './runTypes';
 import { hasAmounts, orphanEntries } from './costs';
+import { termIsActive } from './rules';
 import { SOURCE_LABELS, type CheckLevel, type CheckResult, type CostEntry, type DoctorMaster, type FactRow, type MeasureCode, type SourceId } from './types';
 import { SKIP_REASON_LABELS, type SkipReason } from '@/excel/mapSource';
 import { plural } from '@/lib/plural';
@@ -354,6 +355,25 @@ function datesOutsideMonth(d: RunDiagnostics): CheckResult {
   );
 }
 
+/** A file normally has one grand-total row. More rows without a number may be real data that was not read. */
+function rowsWithoutNumber(d: RunDiagnostics): CheckResult {
+  const many = d.sources.filter((s) => s.status === 'read' && s.skipped.noReference.count > 1);
+  const rows = sum(many.map((s) => s.skipped.noReference.count));
+  return judge(
+    'rows-without-number',
+    'Only the total row has no number',
+    many.length > 0,
+    'Warning',
+    'Every file has at most one row without a bill, admission or consultation number (its grand total).',
+    `${plural(many.length, 'file')} ha${many.length === 1 ? 's' : 've'} more than one row without a number. Such rows are treated as totals or notes and are not counted; check that none of them is a real bill.`,
+    {
+      rows,
+      examples: many.flatMap((s) => s.skipped.noReference.examples).slice(0, 10).map(toExample),
+      details: many.map((s) => `${label(s.sourceId)}: ${plural(s.skipped.noReference.count, 'row')}`),
+    },
+  );
+}
+
 function unreadableUnused(d: RunDiagnostics): CheckResult {
   const list = d.sources.filter((s) => s.unreadableUnused.count > 0);
   const rows = sum(list.map((s) => s.unreadableUnused.count));
@@ -415,7 +435,7 @@ function changeVsPrevious(input: CheckInput): CheckResult {
 // Information: rows that were not used
 // ---------------------------------------------------------------------------
 
-function rowsNotUsed(d: RunDiagnostics): CheckResult {
+function rowsNotUsed(d: RunDiagnostics, rules: RulesFile): CheckResult {
   const details: string[] = [];
   const examples: RowExample[] = [];
   let rows = 0;
@@ -432,12 +452,25 @@ function rowsNotUsed(d: RunDiagnostics): CheckResult {
     rows += t.filtered;
     details.push(`${t.measure} from ${label(t.sourceId)}: ${plural(t.filtered, 'row')} left out by the rule's filter`);
   }
+  // Rule terms that are switched off: their rows are not offered to the measure at all.
+  const off: string[] = [];
+  for (const rule of rules.rules) {
+    if (rule.kind !== 'source') continue;
+    for (const term of rule.terms) {
+      if (!termIsActive(term, rules.flags)) {
+        off.push(`${rule.measure} from ${label(term.sourceId)}: switched off (${term.onlyIf ? `${term.onlyIf.flag} is ${rules.flags[term.onlyIf.flag] ? 'on' : 'off'}` : 'inactive'}), so its rows are not added to this measure`);
+      }
+    }
+  }
+  const lines = [...details, ...off];
   return make(
     'rows-not-used',
     'Rows that were not used',
     'Pass',
-    rows === 0 ? 'Every row of every file was used.' : `${plural(rows, 'row')} ${rows === 1 ? 'was' : 'were'} not used, each for a reason listed below. For information only.`,
-    { rows, details, examples: examples.slice(0, 5).map(toExample) },
+    rows === 0 && off.length === 0
+      ? 'Every row of every file was used.'
+      : `${plural(rows, 'row')} ${rows === 1 ? 'was' : 'were'} not used${off.length > 0 ? `, and ${plural(off.length, 'rule term')} ${off.length === 1 ? 'is' : 'are'} switched off` : ''}, each for a reason listed below. For information only.`,
+    { rows, details: lines, examples: examples.slice(0, 5).map(toExample) },
   );
 }
 
@@ -465,10 +498,11 @@ export function runChecks(input: CheckInput): CheckResult[] {
     pharmacyAttribution(input.facts),
     opOverlap(d, input.rules),
     datesOutsideMonth(d),
+    rowsWithoutNumber(d),
     unreadableUnused(d),
     changeVsPrevious(input),
     ipViaOpPharmacy(d),
-    rowsNotUsed(d),
+    rowsNotUsed(d, input.rules),
   ];
 }
 

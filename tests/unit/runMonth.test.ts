@@ -3,7 +3,9 @@ import { UNMATCHED_KEY, pivot, sumFacts, totalValues } from '@/core/aggregate';
 import { UNATTRIBUTED_DOCTOR_ID, type FactRow, type MeasureCode } from '@/core/types';
 import type { RunOutput } from '@/core/runMonth';
 import { runMonthTask } from '@/worker/tasks/runMonth';
+import { MONTH_DATA } from '../helpers/monthData';
 import { DR_A, DR_B, MONTH, monthRequest, monthSettings } from '../helpers/monthFixture';
+import { hisFile } from '../helpers/syntheticWorkbook';
 
 let cached: Promise<RunOutput> | null = null;
 const defaultRun = () => (cached ??= runMonthTask(monthRequest()));
@@ -214,5 +216,32 @@ describe('overlap of OP Billing and OP Consultations', () => {
     const run = await defaultRun();
     // U1 on 2 Oct and U2 on 3 Oct appear in both files.
     expect(run.diagnostics.opOverlap.pairs).toBe(2);
+  });
+});
+
+describe('an unreadable amount in a field a rule only filters on', () => {
+  it('is counted and left out too, never guessed at', async () => {
+    const settings = monthSettings();
+    const rule = settings.rules.rules.find((r) => r.measure === 'IP_REVENUE');
+    // Cleared bills only, and only when the concession can be read as a number.
+    if (rule?.kind === 'source') rule.terms[0]!.filter = 'AND([status] <> "PENDING", [concession] >= 0)';
+    const req = monthRequest(settings);
+    req.files = req.files.map((f) =>
+      f.sourceId === 'ipGeneralBill'
+        ? {
+            ...f,
+            file: hisFile('IP General Bill Breakup Oct2026.xlsx', MONTH_DATA.ipGeneralBill.header, [
+              ['G1', '02-OCT-2026', 'IP1', 1000, 'oops', 'CLEARED', 'Dr. A Kumar', 'cardiology', 'GENERAL'],
+              ['G2', '03-OCT-2026', 'IP2', 2000, 100, 'CLEARED', 'Dr. A Kumar', 'cardiology', 'STAR'],
+            ]),
+          }
+        : f,
+    );
+    const run = await runMonthTask(req);
+    const term = run.diagnostics.terms.find((t) => t.measure === 'IP_REVENUE' && t.termIndex === 0)!;
+    expect(term.badAmount.count).toBe(1);
+    expect(term.badAmount.examples[0]).toMatchObject({ ref: 'G1' });
+    expect(term.facts).toBe(1); // only G2
+    expect(term.facts + term.filtered + term.badAmount.count + term.filterError.count + term.ipViaOp.count).toBe(term.rowsConsidered);
   });
 });

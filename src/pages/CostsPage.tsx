@@ -18,6 +18,7 @@ import { anyAmounts, applyImport, costRows, orphanEntries, setEntry, toEntries, 
 import { defaultReportMonth, previousMonth } from '@/core/dates';
 import type { CostEntry } from '@/core/types';
 import { plural } from '@/lib/plural';
+import { useUnsavedWarning } from '@/lib/useUnsavedWarning';
 import { readCostsDraft, readCostsToCopy, writeCostsDraft } from '@/storage/costs';
 import type { Workspace } from '@/storage/workspace';
 
@@ -66,6 +67,7 @@ function CostsEditor({ ws }: { ws: Workspace }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const operatorInput = useRef<HTMLInputElement>(null);
 
+  useUnsavedWarning(dirty);
   const rows = useMemo<CostRow[]>(() => costRows(doctors, entries), [doctors, entries]);
   const orphans = useMemo(() => orphanEntries(doctors, entries), [doctors, entries]);
 

@@ -1,21 +1,17 @@
-import type { ComponentType } from 'react';
+import { lazy, type ComponentType } from 'react';
 import type { PageId } from '@/app/nav';
-import { CostsPage } from './CostsPage';
-import { DashboardsPage } from './DashboardsPage';
-import { DoctorsPage } from './DoctorsPage';
-import { MonthsPage } from './MonthsPage';
-import { RunPage } from './RunPage';
-import { SettingsPage } from './SettingsPage';
-import { SourcesPage } from './SourcesPage';
-import { WorkspacePage } from './WorkspacePage';
+
+// Each page is loaded when it is first opened, so the first screen is quick to appear.
+const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) =>
+  lazy(async () => ({ default: (await load())[name] }));
 
 export const PAGE_COMPONENTS: Record<PageId, ComponentType> = {
-  workspace: WorkspacePage,
-  sources: SourcesPage,
-  doctors: DoctorsPage,
-  costs: CostsPage,
-  run: RunPage,
-  months: MonthsPage,
-  dashboards: DashboardsPage,
-  settings: SettingsPage,
+  workspace: page(() => import('./WorkspacePage'), 'WorkspacePage'),
+  sources: page(() => import('./SourcesPage'), 'SourcesPage'),
+  doctors: page(() => import('./DoctorsPage'), 'DoctorsPage'),
+  costs: page(() => import('./CostsPage'), 'CostsPage'),
+  run: page(() => import('./RunPage'), 'RunPage'),
+  months: page(() => import('./MonthsPage'), 'MonthsPage'),
+  dashboards: page(() => import('./DashboardsPage'), 'DashboardsPage'),
+  settings: page(() => import('./SettingsPage'), 'SettingsPage'),
 };
