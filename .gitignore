@@ -1,4 +1,18 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment
+.env*
+
+# Real hospital data — never commit
 samples/
+
+# Excel files are ignored everywhere except synthetic test fixtures
 *.xlsx
-!tests/fixtures/synthetic/*.xlsx
 !tests/fixtures/synthetic/**/*.xlsx
+
+# Editor / OS
+.DS_Store
+Thumbs.db
