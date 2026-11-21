@@ -1,13 +1,12 @@
 // Compare a filled report (made by hand or by an earlier tool) with the tool's own,
 // per row and per column, and show the differences as a readable table.
 
-import type ExcelJS from 'exceljs';
 import { normaliseName } from '@/core/doctors';
-import { MEASURES, measuresFor, type ReportKind } from '@/core/measures';
-import { formatINR, toPaise } from '@/core/money';
+import { MEASURES, type ReportKind } from '@/core/measures';
+import { formatINR } from '@/core/money';
 import type { ReportRow } from '@/core/report';
 import type { MeasureCode } from '@/core/types';
-import { loadTemplate } from '@/excel/templates';
+import { readReportRows } from '@/excel/readReport';
 
 export type ExpectedRow = { name: string; values: Partial<Record<MeasureCode, number>> };
 
@@ -22,33 +21,9 @@ export type Comparison = {
   rowsCompared: number;
 };
 
-/** A cell as paise (money) or as a plain count; null when blank or unreadable. */
-function numberOf(cell: ExcelJS.Cell, kind: 'money' | 'count' | 'calc'): number | null {
-  const v = cell.value;
-  const raw = v !== null && typeof v === 'object' && 'result' in v ? v.result : v;
-  if (kind === 'count') return typeof raw === 'number' ? raw : null;
-  return typeof raw === 'number' || typeof raw === 'string' ? toPaise(raw) : null;
-}
-
-/** The rows of a filled report workbook, or null when it holds no data rows (an empty template). */
+/** Reads a filled report; null when it holds no data rows (an empty template). */
 export async function readExpectedReport(bytes: ArrayBuffer | Uint8Array, kind: ReportKind): Promise<ExpectedRow[] | null> {
-  const table = await loadTemplate(bytes, kind);
-  const nameCol = table.columns.get(kind === 'drr' ? 'Doctor Name' : 'Sponsor Name') as number;
-  const rows: ExpectedRow[] = [];
-  for (let r = table.firstDataRow; r <= table.sheet.rowCount; r++) {
-    const line = table.sheet.getRow(r);
-    const raw = line.getCell(nameCol).value;
-    const name = typeof raw === 'string' ? raw.trim() : '';
-    if (name === '') continue;
-    const values: ExpectedRow['values'] = {};
-    for (const m of measuresFor(kind)) {
-      const col = table.columns.get(kind === 'drr' ? m.drrHeader : (m.sponsorHeader as string));
-      const value = col === undefined ? null : numberOf(line.getCell(col), m.kind);
-      if (value !== null) values[m.code] = value;
-    }
-    rows.push({ name, values });
-  }
-  return rows.length > 0 ? rows : null;
+  return (await readReportRows(bytes, kind))?.map(({ name, values }) => ({ name, values })) ?? null;
 }
 
 const keyOf = (name: string) => normaliseName(name).key;

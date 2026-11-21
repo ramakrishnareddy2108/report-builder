@@ -6,7 +6,10 @@
 import type { ReportKind } from '@/core/measures';
 import type { ReportRow } from '@/core/report';
 import type { CheckResult, FactRow } from '@/core/types';
+import { MEASURES, computeMeasure } from '@/core/measures';
 import { buildReport, reportFileName } from '@/excel/buildReport';
+import { buildCompareWorkbook, type CompareExportInput } from '@/excel/compareSheet';
+import { readReportRows, type ReadReportRow } from '@/excel/readReport';
 import { checkTemplate } from '@/excel/templateCheck';
 import { TemplateError, loadTemplate } from '@/excel/templates';
 import type { TaskProgress } from '../protocol';
@@ -84,4 +87,40 @@ export async function inspectTemplateTask(req: InspectTemplateRequest): Promise<
     if (err instanceof TemplateError) return { ok: false, message: err.message };
     throw err;
   }
+}
+
+export type ReadReportRequest = { bytes: ArrayBuffer };
+export type ReadReportResult =
+  | {
+      ok: true;
+      rows: ReadReportRow[];
+      /** Rows whose Total Revenue or Gross Profit in the file differs (by more than Rs 1) from the sum of their parts. */
+      inconsistentRows: string[];
+    }
+  | { ok: false; message: string };
+
+/** Read a filled past DRR. Never throws for a bad file: the message says what is wrong. */
+export async function readReportTask(req: ReadReportRequest): Promise<ReadReportResult> {
+  try {
+    const rows = await readReportRows(req.bytes, 'drr');
+    if (!rows) return { ok: false, message: 'The DRR has no filled rows: it looks like an empty template.' };
+    const inconsistentRows = rows
+      .filter((r) => {
+        const inputs = Object.fromEntries(MEASURES.filter((m) => m.kind !== 'calc').map((m) => [m.code, r.values[m.code] ?? 0]));
+        return MEASURES.filter((m) => m.kind === 'calc').some((m) => {
+          const given = r.values[m.code];
+          return given !== undefined && Math.abs(given - computeMeasure(m.code, inputs)) > 100;
+        });
+      })
+      .map((r) => r.name);
+    return { ok: true, rows, inconsistentRows };
+  } catch (err) {
+    if (err instanceof TemplateError) return { ok: false, message: err.message };
+    throw err;
+  }
+}
+
+/** The Compare view as an Excel workbook. */
+export async function exportCompareTask(req: CompareExportInput): Promise<Uint8Array> {
+  return buildCompareWorkbook(req);
 }

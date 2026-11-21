@@ -151,3 +151,14 @@ export function paiseToRupees(paise: number): number {
   assertPaise(paise, 'paiseToRupees');
   return paise / 100;
 }
+
+/** Short Indian form for chart axes: 1,25,00,000 -> "₹1.25 Cr", 4,50,000 -> "₹4.5 L", 12,345 -> "₹12,345". Display only. */
+export function formatCompactINR(paise: number): string {
+  assertPaise(paise, 'formatCompactINR');
+  const rupees = Math.abs(paise) / 100;
+  const sign = paise < 0 ? '-' : '';
+  const trim = (n: number) => String(Number(n.toFixed(2)));
+  if (rupees >= 1e7) return `${sign}₹${trim(rupees / 1e7)} Cr`;
+  if (rupees >= 1e5) return `${sign}₹${trim(rupees / 1e5)} L`;
+  return `${sign}₹${IN_GROUPING.format(Math.round(rupees))}`;
+}

@@ -361,6 +361,7 @@ export const RunInfoSchema = z
     version,
     month: MonthSchema,
     runNumber: z.int().min(1),
+    kind: z.enum(['run', 'summary']).optional(),
     status: z.enum(['Draft', 'Final']),
     createdAt: IsoDateTime,
     finalizedAt: IsoDateTime.optional(),
@@ -380,6 +381,26 @@ export const RunInfoSchema = z
       ctx.addIssue({ code: 'custom', message: 'A Final run needs finalizedAt', path: ['finalizedAt'] });
     }
   });
+
+// ---------------------------------------------------------------------------
+// data/<month>/run-<n>/summary.json (a past month imported from a filled DRR)
+// ---------------------------------------------------------------------------
+
+export const SummaryFileSchema = z.object({
+  version,
+  month: MonthSchema,
+  runNumber: z.int().min(1),
+  /** Name of the workbook it was read from. */
+  sourceFile: NonEmpty,
+  rows: z.array(
+    z.object({
+      name: NonEmpty,
+      department: z.string(),
+      // Integer paise for money, plain numbers for counts.
+      values: z.partialRecord(MeasureCodeSchema, Paise),
+    }),
+  ),
+});
 
 // ---------------------------------------------------------------------------
 // data/<month>/run-<n>/settings-used.json
@@ -428,6 +449,7 @@ export type CostsFile = z.infer<typeof CostsFileSchema>;
 export type FactsFile = z.infer<typeof FactsFileSchema>;
 export type ChecksFile = z.infer<typeof ChecksFileSchema>;
 export type RunInfoFile = z.infer<typeof RunInfoSchema>;
+export type SummaryFile = z.infer<typeof SummaryFileSchema>;
 export type SettingsUsedFile = z.infer<typeof SettingsUsedFileSchema>;
 export type DashboardsFile = z.infer<typeof DashboardsFileSchema>;
 export type BackupManifest = z.infer<typeof BackupManifestSchema>;

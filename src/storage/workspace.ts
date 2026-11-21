@@ -19,6 +19,7 @@ import {
   RunInfoSchema,
   SettingsUsedFileSchema,
   SourcesFileSchema,
+  SummaryFileSchema,
 } from '@/core/schemas';
 import type { RunStatus } from '@/core/types';
 import { fsDirFromHandle, type FsDir } from './fs';
@@ -121,6 +122,7 @@ const RUN_FILE_SCHEMAS: Readonly<Record<string, z.ZodType>> = {
   'checks.json': ChecksFileSchema,
   'settings-used.json': SettingsUsedFileSchema,
   'run-info.json': RunInfoSchema,
+  'summary.json': SummaryFileSchema,
 };
 
 const SETTINGS_SCHEMAS: Readonly<Record<string, z.ZodType>> = {

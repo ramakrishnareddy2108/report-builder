@@ -16,6 +16,8 @@
     "ag-grid-react": "^36.3.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.1.0",
     "exceljs": "^4.4.0",
     "idb-keyval": "^6.3.0",
     "jszip": "^3.10.2",

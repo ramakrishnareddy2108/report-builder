@@ -22,6 +22,7 @@ export function SavedRunsList({ ws }: { ws: Workspace }) {
                 {r.info.status === 'Final' && <Lock />}
                 {r.info.status}
               </Badge>
+              {r.info.kind === 'summary' && <Badge variant="outline">Imported</Badge>}
               <span className="min-w-0 flex-1 text-xs text-muted-foreground">
                 {r.info.operatorName || 'Unknown'}, {new Date(r.info.createdAt).toLocaleString('en-IN')}
                 {r.info.reason ? `. Reason: ${r.info.reason}` : ''}
@@ -30,8 +31,8 @@ export function SavedRunsList({ ws }: { ws: Workspace }) {
           ) : (
             <span className="flex-1 text-xs text-destructive">{r.error ?? 'Its run-info.json is missing.'}</span>
           )}
-          <Button variant="outline" size="sm" disabled={busy || !r.info || open === r.runNumber} onClick={() => void openRun(ws, r.runNumber)}>
-            {open === r.runNumber ? 'Showing' : 'Open'}
+          <Button variant="outline" size="sm" disabled={busy || !r.info || r.info.kind === 'summary' || open === r.runNumber} onClick={() => void openRun(ws, r.runNumber)}>
+            {open === r.runNumber ? 'Showing' : r.info?.kind === 'summary' ? 'No details' : 'Open'}
           </Button>
         </li>
       ))}

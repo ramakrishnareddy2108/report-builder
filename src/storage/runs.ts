@@ -4,6 +4,7 @@
 // run-info.json is written last, so a run whose other files are incomplete
 // never claims to be saved.
 
+import type { z } from 'zod';
 import {
   ChecksFileSchema,
   CostsFileSchema,
@@ -82,10 +83,14 @@ async function assertWritable(ws: Workspace, month: string, runNumber: number): 
   }
 }
 
+/** An extra file of a run (such as summary.json), written before run-info.json. */
+export type ExtraRunFile = { name: string; data: unknown; schema: z.ZodType };
+
 /** Save a run. Refuses to touch a Final run. run-info.json goes last. */
-export async function writeRun(ws: Workspace, bundle: RunBundle): Promise<void> {
+export async function writeRun(ws: Workspace, bundle: RunBundle, extras: readonly ExtraRunFile[] = []): Promise<void> {
   const { month, runNumber } = bundle.info;
   await assertWritable(ws, month, runNumber);
+  for (const extra of extras) await ws.writeJson(file(month, runNumber, extra.name), extra.data, extra.schema);
   await ws.writeJson(file(month, runNumber, RUN_FILES.facts), bundle.facts, FactsFileSchema);
   await ws.writeJson(file(month, runNumber, RUN_FILES.costs), bundle.costs, CostsFileSchema);
   await ws.writeJson(file(month, runNumber, RUN_FILES.checks), bundle.checks, ChecksFileSchema);

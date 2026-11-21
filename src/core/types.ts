@@ -277,9 +277,14 @@ export type FileFingerprint = {
   sha256: string; // 64 lowercase hex chars
 };
 
+/** A run made from the sources, or a past month imported from a filled DRR (no fact rows). */
+export type RunKind = 'run' | 'summary';
+
 export type RunInfo = {
   month: string;
   runNumber: number;
+  /** Missing means 'run'. */
+  kind?: RunKind;
   status: RunStatus;
   createdAt: string; //  ISO date-time
   finalizedAt?: string;

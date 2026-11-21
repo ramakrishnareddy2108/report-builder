@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatINR, paiseToRupees, parseMoney, sumPaise, toPaise } from '@/core/money';
+import { formatCompactINR, formatINR, paiseToRupees, parseMoney, sumPaise, toPaise } from '@/core/money';
 
 describe('toPaise — numbers', () => {
   it.each([
@@ -174,4 +174,16 @@ describe('paiseToRupees', () => {
     expect(paiseToRupees(-1)).toBe(-0.01);
     expect(() => paiseToRupees(0.5)).toThrow(TypeError);
   });
+});
+
+describe('formatCompactINR', () => {
+  it.each([
+    [1250000000, '₹1.25 Cr'],
+    [45000000, '₹4.5 L'],
+    [1234500, '₹12,345'],
+    [-45000000, '-₹4.5 L'],
+    [0, '₹0'],
+    [10000000000, '₹10 Cr'],
+  ])('%i paise -> %s', (paise, text) => expect(formatCompactINR(paise)).toBe(text));
+  it('refuses a fraction of a paisa', () => expect(() => formatCompactINR(1.5)).toThrow());
 });

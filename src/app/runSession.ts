@@ -16,14 +16,14 @@ import type { CheckResult, CostEntry, FactRow, FileFingerprint, RunStatus } from
 import { SOURCE_IDS } from '@/core/types';
 import { readCostsDraft } from '@/storage/costs';
 import { doctorReport, sponsorReport } from '@/core/report';
-import { downloadFile } from '@/storage/backup';
 import { findPreviousFinal, finalizeRun, listRuns, readRun, writeRun, type RunSummary } from '@/storage/runs';
 import { readTemplate } from '@/storage/templates';
-import { joinPath, paths, type Workspace } from '@/storage/workspace';
-import { buildReportsInWorker, checkTemplatesInWorker, runMonthInWorker } from '@/worker/client';
+import type { Workspace } from '@/storage/workspace';
+import { checkTemplatesInWorker, runMonthInWorker } from '@/worker/client';
 import type { BuildReportsResult } from '@/worker/tasks/reports';
 import type { TaskProgress } from '@/worker/protocol';
 import { fileForSource, useFiles } from './filesStore';
+import { makeAndSaveReports } from './reportFiles';
 import { useSettings } from './settingsStore';
 
 /** What the Run page shows: a fresh run, or a saved one opened for viewing. */
@@ -271,8 +271,6 @@ export async function markFinal(ws: Workspace, options: SaveOptions): Promise<nu
   }
 }
 
-const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
 /**
  * Make the two Excel reports for the saved run, keep a copy in output/<month>/, and offer them for download.
  * The run must be saved first, so every report can be traced to a run (and its settings).
@@ -284,25 +282,18 @@ export async function downloadReports(ws: Workspace): Promise<BuildReportsResult
 
   set({ busy: 'reports', progress: { stage: 'Making the reports', fraction: 0 } });
   try {
-    const built = await buildReportsInWorker(
+    return await makeAndSaveReports(
+      ws,
       {
         month: result.month,
         runNumber: result.saved.runNumber,
-        drr: await readTemplate(ws, 'drr'),
-        sponsor: await readTemplate(ws, 'sponsor'),
-        drrRows: doctorReport(result.facts, result.costs, result.settings.doctors.doctors, result.month),
-        sponsorRows: sponsorReport(result.facts, result.month),
-        checks: checksWithNotes(result, notes),
         facts: result.facts,
-        doctorNames: result.settings.doctors.doctors.map((d) => [d.id, d.displayName]),
+        costs: result.costs,
+        doctors: result.settings.doctors.doctors,
+        checks: checksWithNotes(result, notes),
       },
       (progress) => set({ progress }),
     );
-    for (const file of built.files) {
-      await ws.writeFile(joinPath(paths.outputMonth(result.month), file.fileName), file.bytes);
-      downloadFile(file.bytes, file.fileName, XLSX_MIME);
-    }
-    return built;
   } finally {
     set({ busy: null, progress: null });
   }
