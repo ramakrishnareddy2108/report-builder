@@ -114,6 +114,15 @@ describe('ensureLayout', () => {
   });
 });
 
+describe('ensureLayout called twice at once', () => {
+  it('shares one run, so the two callers never race on the same temp file', async () => {
+    const { root, ws } = newWorkspace();
+    const [a, b] = await Promise.all([ws.ensureLayout(), ws.ensureLayout()]);
+    expect(a).toEqual(b);
+    expect(root.log.filter((l) => l.startsWith('write rules.json'))).toHaveLength(1);
+  });
+});
+
 describe('JSON helpers', () => {
   it('writes via a temp file then renames, leaving no temp file', async () => {
     const { root, ws } = newWorkspace();

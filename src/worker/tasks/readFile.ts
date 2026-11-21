@@ -25,6 +25,8 @@ export type ReadFileRequest = {
   signatures?: SourceSignature[];
   /** Skip reading data rows (identification and header only). */
   headersOnly?: boolean;
+  /** Read only the first N Excel rows of the sheet (for previews). */
+  maxRows?: number;
 };
 
 export type SheetSummary = {
@@ -89,6 +91,7 @@ export async function readFileTask(req: ReadFileRequest, onProgress: Progress = 
     } else {
       onProgress({ stage: 'Reading rows', fraction: 0.65 });
       data = readSheetRows(wb, sheet, {
+        maxRows: req.maxRows,
         progressEvery: 2000,
         onProgress: (done, total) =>
           onProgress({

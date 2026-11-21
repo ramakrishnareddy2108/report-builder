@@ -20,6 +20,9 @@ export const SOURCE_IDS = [
 ] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 
+/** OP pharmacy is attributed to doctors using this source's consultations. */
+export const ATTRIBUTION_SOURCE_ID: SourceId = 'opConsultations';
+
 /** Names shown to the user. */
 export const SOURCE_LABELS: Readonly<Record<SourceId, string>> = {
   ipAdmissions: 'IP Admissions',
@@ -57,6 +60,27 @@ export const FIELD_KEYS = [
   'pharmacyCost',
 ] as const;
 export type FieldKey = (typeof FIELD_KEYS)[number];
+
+/** Names shown to the user, with a hint on what the field is. */
+export const FIELD_LABELS: Readonly<Record<FieldKey, { label: string; hint: string }>> = {
+  ref: { label: 'Bill / admission no.', hint: 'Identifies the row; rows without it are treated as grand-total rows' },
+  txnDate: { label: 'Date', hint: 'Bill, admission, discharge or consultation date' },
+  umrno: { label: 'UMR no.', hint: 'Patient registration number (used to attribute pharmacy to a doctor)' },
+  admissionNo: { label: 'IP admission no.', hint: 'Filled for in-patients, blank for OP rows' },
+  originalRef: { label: 'Original bill no.', hint: 'The bill a return refers to' },
+  doctor: { label: 'Doctor', hint: 'Doctor name as written in the file' },
+  department: { label: 'Department', hint: 'Department name as written in the file' },
+  sponsor: { label: 'Sponsor', hint: 'ORGANIZATIONNAME (ORGNAME in IP General Bill)' },
+  status: { label: 'Bill status', hint: 'For example CLEARED or PENDING' },
+  billType: { label: 'Bill type', hint: 'For example OP / Corporate. or C / G' },
+  grossAmount: { label: 'Gross amount', hint: 'Rupees' },
+  concession: { label: 'Concession', hint: 'Rupees' },
+  netAmount: { label: 'Net amount', hint: 'Rupees' },
+  saleValue: { label: 'Sale value (before tax)', hint: 'Rupees' },
+  purchaseValue: { label: 'Purchase value (before tax)', hint: 'Rupees' },
+  pharmacyAmount: { label: 'IP pharmacy (net)', hint: 'Rupees' },
+  pharmacyCost: { label: 'IP pharmacy cost', hint: 'Rupees' },
+};
 
 export type FieldKind = 'id' | 'text' | 'date' | 'money';
 

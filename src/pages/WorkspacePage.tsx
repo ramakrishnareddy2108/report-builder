@@ -1,7 +1,9 @@
 import { AlertTriangle, Archive, FolderOpen, RotateCcw, Upload } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useSettings } from '@/app/settingsStore';
 import { useAppStore } from '@/app/store';
+import { useWorkspace } from '@/app/useWorkspace';
 import { chooseWorkspace, reconnectWorkspace } from '@/app/workspaceSession';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
@@ -17,7 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { applyRestore, createBackup, downloadFile, planRestore, type RestorePlan } from '@/storage/backup';
-import { openWorkspace, type WorkspaceSummary } from '@/storage/workspace';
+import type { Workspace, WorkspaceSummary } from '@/storage/workspace';
 
 function isPermissionError(err: unknown): boolean {
   return err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
@@ -33,6 +35,7 @@ async function choose() {
 
 export function WorkspacePage() {
   const connection = useAppStore((s) => s.connection);
+  const ws = useWorkspace();
 
   return (
     <>
@@ -76,14 +79,13 @@ export function WorkspacePage() {
           }
         />
       )}
-      {connection.status === 'ready' && <ConnectedWorkspace handle={connection.handle} />}
+      {connection.status === 'ready' && ws && <ConnectedWorkspace ws={ws} handle={connection.handle} />}
     </>
   );
 }
 
-function ConnectedWorkspace({ handle }: { handle: FileSystemDirectoryHandle }) {
+function ConnectedWorkspace({ ws, handle }: { ws: Workspace; handle: FileSystemDirectoryHandle }) {
   const setConnection = useAppStore((s) => s.setConnection);
-  const ws = useMemo(() => openWorkspace(handle), [handle]);
   const [summary, setSummary] = useState<WorkspaceSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'backup' | 'restore' | null>(null);
@@ -160,6 +162,7 @@ function ConnectedWorkspace({ handle }: { handle: FileSystemDirectoryHandle }) {
       toast.success(n === 0 ? 'Nothing to restore — the workspace already matches the backup.' : `Restored ${n} files.`);
       setPlan(null);
       await refresh();
+      await useSettings.getState().load(ws); // pages must see the restored settings
     } catch (err) {
       setPlan(null);
       handleError(err, 'Restore stopped part-way. Some files may already be replaced');

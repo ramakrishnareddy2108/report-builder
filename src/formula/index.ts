@@ -9,6 +9,7 @@ import { FUNCTIONS } from './functions';
 import { parse } from './parser';
 import { FormulaError, FormulaSyntaxError, type FormulaContext, type Node, type Value } from './types';
 
+export { toBool } from './coerce';
 export { ColumnIndex, recordContext } from './context';
 export { FormulaError, FormulaSyntaxError } from './types';
 export type { FormulaContext, Value } from './types';

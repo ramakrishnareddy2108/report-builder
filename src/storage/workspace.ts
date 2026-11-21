@@ -308,7 +308,18 @@ export class Workspace {
    * Create any missing layout folders and seed settings/rules.json from the defaults.
    * Existing files are never touched. Returns the paths that were created.
    */
-  async ensureLayout(): Promise<string[]> {
+  ensureLayout(): Promise<string[]> {
+    // Two callers at once (the Workspace page and the settings loader) share one run;
+    // otherwise they would race on the same temp file.
+    this.layoutInFlight ??= this.createLayout().finally(() => {
+      this.layoutInFlight = null;
+    });
+    return this.layoutInFlight;
+  }
+
+  private layoutInFlight: Promise<string[]> | null = null;
+
+  private async createLayout(): Promise<string[]> {
     const created: string[] = [];
     for (const path of LAYOUT_DIRS) {
       const segs = splitPath(path);

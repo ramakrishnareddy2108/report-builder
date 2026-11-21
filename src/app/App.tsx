@@ -5,8 +5,10 @@ import { PAGE_COMPONENTS } from '@/pages';
 import { isFileSystemAccessSupported } from '@/storage/workspace';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { useSettings } from './settingsStore';
 import { useAppStore } from './store';
 import { UnsupportedBrowser } from './UnsupportedBrowser';
+import { useWorkspace } from './useWorkspace';
 import { restoreWorkspace } from './workspaceSession';
 
 export function App() {
@@ -16,6 +18,12 @@ export function App() {
   useEffect(() => {
     if (supported) void restoreWorkspace();
   }, [supported]);
+
+  // Settings are read once per connected folder and shared by every page.
+  const ws = useWorkspace();
+  useEffect(() => {
+    if (ws) void useSettings.getState().load(ws);
+  }, [ws]);
 
   if (!supported) return <UnsupportedBrowser />;
 
