@@ -93,6 +93,7 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
     unreadable: [],
     footerRows: [],
     duplicates: [],
+    formulaCellsWithoutValue: 0,
     errors: [],
   };
   const fail = (...issues: Issue[]): ReadSourceResult => ({ ...result, rows: [], footerRows: [], errors: [...result.errors, ...issues] });
@@ -117,6 +118,7 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
     return fail(error(`${def.label}: the header row is ${headerRow}, but the sheet “${picked.name}” has only ${sheet.rows.length} rows. Fix the header row in Sources.`));
   }
   result.headerRow = headerRow;
+  result.formulaCellsWithoutValue = sheet.stats.formulaCellsWithoutValue;
   const header = headersAt(sheet.rows, headerRow);
   const cols = new ColumnIndex(header.headers);
 

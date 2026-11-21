@@ -2,6 +2,7 @@
 
 import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import type { CombineRequest, CombineTaskResult } from './tasks/combine';
+import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 type Pending = {
@@ -61,4 +62,13 @@ export function inspectFileInWorker(request: InspectFileRequest, onProgress?: (p
 
 export function combineInWorker(request: CombineRequest, onProgress?: (p: TaskProgress) => void): Promise<CombineTaskResult> {
   return runTask('combine', request, onProgress);
+}
+
+export function generateInWorker(request: GenerateRequest, onProgress?: (p: TaskProgress) => void): Promise<GenerateTaskResult> {
+  return runTask('generate', request, onProgress);
+}
+
+/** The combined table of the last generate run, as Excel bytes. */
+export function exportCombinedInWorker(): Promise<Uint8Array> {
+  return runTask('exportCombined', null);
 }

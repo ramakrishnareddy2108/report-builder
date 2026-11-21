@@ -67,9 +67,14 @@ export type ReadSourceResult = {
   footerRows: SourceRow[];
   /** Examples of repeated IDs (value → Excel rows), when `uniqueColumn` is set. */
   duplicates: { value: string; rows: number[] }[];
+  /** Formula cells the export saved without a calculated value: they read as blank. */
+  formulaCellsWithoutValue: number;
   /** Blocking errors (a missing column, a bad formula). When there are any, `rows` is empty. */
   errors: Issue[];
 };
+
+/** A source's result without its rows (they are in the combined table), plus the file it came from. */
+export type SourceSummary = Omit<ReadSourceResult, 'rows'> & { fileName: string };
 
 export type CombinedRow = Record<string, Typed>;
 

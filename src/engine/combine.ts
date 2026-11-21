@@ -30,7 +30,7 @@ function paramCell(type: 'text' | 'number' | 'date', raw: string): string | numb
   return text;
 }
 
-export function combine(readings: readonly SourceReading[], recipe: Pick<Recipe, 'parameters'>, params: ParamValues): CombineResult {
+export function combine(readings: readonly SourceReading[], recipe: Pick<Recipe, 'parameters'> & { sources?: readonly SourceDef[] }, params: ParamValues): CombineResult {
   const issues: Issue[] = [];
   const columns: ColumnDef[] = [];
   const typeOf = new Map<string, { type: ColumnType; sourceLabel: string }>(); // upper-case name → first definition
@@ -51,6 +51,12 @@ export function combine(readings: readonly SourceReading[], recipe: Pick<Recipe,
     }
   };
 
+  // Columns the recipe declares, even for a source that has no file this time (an optional source), so that
+  // report columns built on them simply come out as zero instead of failing.
+  for (const def of recipe.sources ?? []) {
+    for (const c of def.columns) add(c.as, c.type, def.label, def.id);
+    for (const c of def.calculated) add(c.as, c.type, def.label, def.id);
+  }
   for (const reading of readings) {
     for (const c of reading.result.columns) add(c.name, c.type, reading.source.label, reading.source.id);
   }

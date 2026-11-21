@@ -2,6 +2,7 @@
 // worker answers with any number of progress messages, then one result or error.
 
 import type { CombineRequest, CombineTaskResult } from './tasks/combine';
+import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 export type TaskProgress = {
@@ -16,6 +17,8 @@ export type TaskProgress = {
 export type TaskMap = {
   inspectFile: { request: InspectFileRequest; result: InspectFileResult };
   combine: { request: CombineRequest; result: CombineTaskResult };
+  generate: { request: GenerateRequest; result: GenerateTaskResult };
+  exportCombined: { request: null; result: Uint8Array };
 };
 export type TaskName = keyof TaskMap;
 

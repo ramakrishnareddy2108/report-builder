@@ -4,7 +4,7 @@
 import { combine } from '@/engine/combine';
 import { paramValues } from '@/engine/rowContext';
 import { readSource } from '@/engine/readSource';
-import type { CombinedTable, Issue, ParamValues, ReadSourceResult } from '@/engine/types';
+import type { CombinedTable, Issue, ParamValues, ReadSourceResult, SourceSummary } from '@/engine/types';
 import { openWorkbook } from '@/excel/readWorkbook';
 import type { Recipe } from '@/recipe/schema';
 import type * as XLSX from 'xlsx';
@@ -18,9 +18,6 @@ export type CombineRequest = {
   /** Return at most this many combined rows (the total is always reported). Default: all. */
   maxRows?: number;
 };
-
-/** A source's result without its rows (they are in the combined table). */
-export type SourceSummary = Omit<ReadSourceResult, 'rows'> & { fileName: string };
 
 export type CombineTaskResult = {
   table: CombinedTable;
