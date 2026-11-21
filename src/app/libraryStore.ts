@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import type { DashboardTemplate } from '@/dashboard/schema';
 import { downloadFile } from '@/lib/download';
 import { buildLibraryFile, libraryFileName, type ImportPlan } from '@/recipe/importExport';
+import { starterRecipes } from '@/recipe/defaults';
 import { createLibrary, idbStore, type Library } from '@/recipe/library';
 import type { Recipe } from '@/recipe/schema';
 
@@ -42,6 +43,8 @@ type LibraryState = {
   deleteDashboard: (id: string) => Promise<void>;
   duplicateDashboard: (id: string) => Promise<DashboardTemplate | null>;
   importLibrary: (plan: Extract<ImportPlan, { ok: true }>) => Promise<void>;
+  /** Adds the DRR and Sponsor-wise starter recipes that are not in the library yet. Returns how many were added. */
+  addStarters: () => Promise<number>;
   exportLibrary: () => void;
 };
 
@@ -92,6 +95,12 @@ export const useLibrary = create<LibraryState>()((set, get) => {
     deleteDashboard: (id) => change(() => lib().deleteDashboard(id)),
     duplicateDashboard: (id) => change(() => lib().duplicateDashboard(id)),
     importLibrary: (plan) => change(() => lib().applyImport(plan)),
+    addStarters: async () => {
+      const have = new Set(get().recipes.map((r) => r.id));
+      const missing = starterRecipes().filter((r) => !have.has(r.id));
+      for (const r of missing) await change(() => lib().saveRecipe(r));
+      return missing.length;
+    },
     exportLibrary: () => {
       const { recipes, dashboards } = get();
       downloadFile(libraryFileName(), JSON.stringify(buildLibraryFile(recipes, dashboards), null, 2), 'application/json');

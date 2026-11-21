@@ -1,4 +1,4 @@
-import { BookOpen, Copy, Download, EllipsisVertical, LayoutDashboard, Pencil, Play, Plus, Trash2, Upload } from 'lucide-react';
+import { BookOpen, Copy, Download, Sparkles, EllipsisVertical, LayoutDashboard, Pencil, Play, Plus, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLibrary } from '@/app/libraryStore';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { blankRecipe } from '@/recipe/blank';
+import { STARTER_IDS } from '@/recipe/defaults';
 import { checkRecipe, hasProblems } from '@/recipe/validate';
 import { ImportDialog } from './ImportDialog';
 
@@ -83,6 +84,13 @@ export function HomePage() {
     go({ page: 'recipe', recipeId: saved.id });
   }
 
+  const missingStarters = STARTER_IDS.some((id) => !recipes.some((r) => r.id === id));
+
+  async function addStarters() {
+    const n = await lib().addStarters();
+    if (n > 0) toast.success(`Added ${n} starter recipe${n === 1 ? '' : 's'}. Open one and add its Excel template to begin.`);
+  }
+
   async function duplicate(kind: Doomed['kind'], id: string) {
     const copy = kind === 'recipe' ? await lib().duplicateRecipe(id) : await lib().duplicateDashboard(id);
     if (copy) toast.success(`Created “${copy.name}”.`);
@@ -123,10 +131,18 @@ export function HomePage() {
           <h2 id="recipes-h" className="text-lg font-medium">
             Recipes
           </h2>
-          <Button onClick={() => void newRecipe()}>
-            <Plus className="size-4" />
-            New recipe
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {missingStarters && recipes.length > 0 && (
+              <Button variant="outline" onClick={() => void addStarters()}>
+                <Sparkles className="size-4" />
+                Add starter recipes
+              </Button>
+            )}
+            <Button onClick={() => void newRecipe()}>
+              <Plus className="size-4" />
+              New recipe
+            </Button>
+          </div>
         </div>
 
         {recipes.length === 0 ? (
@@ -135,10 +151,16 @@ export function HomePage() {
             title="No recipes yet"
             description="A recipe tells the app how to turn your Excel exports into a finished report. Create one once, then use it every month."
             action={
-              <Button onClick={() => void newRecipe()}>
-                <Plus className="size-4" />
-                New recipe
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button onClick={() => void addStarters()}>
+                  <Sparkles className="size-4" />
+                  Add starter recipes: DRR, Sponsor-wise
+                </Button>
+                <Button variant="outline" onClick={() => void newRecipe()}>
+                  <Plus className="size-4" />
+                  Start from scratch
+                </Button>
+              </div>
             }
           />
         ) : (

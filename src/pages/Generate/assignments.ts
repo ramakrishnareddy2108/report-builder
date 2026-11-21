@@ -16,10 +16,12 @@ export type SourceSlot = {
 
 export type SlotsResult = {
   slots: SourceSlot[];
-  /** Files nobody has placed yet (and not marked "not used"). */
+  /** Files that could be more than one source: the user must choose. These block Generate. */
   unplaced: { fileName: string; candidates: string[]; reason: string }[];
+  /** Files that match no source (or that the user left out). They are not used, and the Checks say so. */
+  ignored: string[];
   assignments: { sourceId: string; fileName: string }[];
-  /** Every required source has one file, no source has two, and no file is left unplaced. */
+  /** Every required source has one file, no source has two, and no file is waiting for a choice. */
   ready: boolean;
 };
 
@@ -42,16 +44,16 @@ export function buildSlots(recipe: Pick<Recipe, 'sources'>, fileNames: readonly 
     return { sourceId: s.id, label: s.label, required: s.required, files, state };
   });
 
-  const unplaced = fileNames
-    .filter((n) => sourceOfFile.get(n) === null && manual[n] !== NOT_USED)
-    .map((fileName) => {
-      const amb = auto.ambiguous.find((a) => a.fileName === fileName);
-      return { fileName, candidates: amb?.candidates ?? [], reason: amb?.reason ?? 'This file does not look like any source of the recipe. Choose which one it is, or leave it out.' };
-    });
+  const waiting = fileNames.filter((n) => sourceOfFile.get(n) === null && manual[n] !== NOT_USED);
+  const unplaced = waiting.flatMap((fileName) => {
+    const amb = auto.ambiguous.find((a) => a.fileName === fileName);
+    return amb ? [{ fileName, candidates: amb.candidates, reason: amb.reason }] : [];
+  });
+  const ignored = fileNames.filter((n) => sourceOfFile.get(n) === null && !unplaced.some((u) => u.fileName === n));
 
   const assignments = slots.filter((s) => s.files.length === 1).map((s) => ({ sourceId: s.sourceId, fileName: s.files[0] as string }));
   const ready = unplaced.length === 0 && slots.every((s) => s.state === 'ok' || s.state === 'optional-missing');
-  return { slots, unplaced, assignments, ready };
+  return { slots, unplaced, ignored, assignments, ready };
 }
 
 /** "Oct-2026" for the month before today, for a parameter that asks for the month and has no default. */

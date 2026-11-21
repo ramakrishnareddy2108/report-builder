@@ -1,0 +1,663 @@
+{
+  "schemaVersion": 1,
+  "id": "starter-sponsor-wise",
+  "name": "Sponsor-wise Revenue Report",
+  "description": "Revenue and gross profit by sponsor (insurance / corporate / cash) for a month.",
+  "updatedAt": "2026-11-21T00:00:00.000Z",
+  "parameters": [
+    {
+      "name": "Month",
+      "type": "text",
+      "label": "Report month (e.g. Oct-2026)"
+    }
+  ],
+  "sources": [
+    {
+      "required": true,
+      "headerRow": 3,
+      "calculated": [
+        {
+          "as": "IPCount",
+          "formula": "1",
+          "type": "number"
+        }
+      ],
+      "id": "ipDischarge",
+      "label": "IP Discharge",
+      "match": {
+        "namePattern": "IP Discharge Report",
+        "requiredHeaders": [
+          "DOCTORNAME",
+          "DEPARTMENTNAME",
+          "ORGANIZATIONNAME",
+          "ADMISSIONNO",
+          "DISCHARGEDT"
+        ]
+      },
+      "sheet": {
+        "name": "Sheet1"
+      },
+      "columns": [
+        {
+          "from": "DOCTORNAME",
+          "as": "Doctor",
+          "type": "text"
+        },
+        {
+          "from": "DEPARTMENTNAME",
+          "as": "Department",
+          "type": "text"
+        },
+        {
+          "from": "ORGANIZATIONNAME",
+          "as": "Sponsor",
+          "type": "text"
+        },
+        {
+          "from": "ADMISSIONNO",
+          "as": "Ref",
+          "type": "text"
+        },
+        {
+          "from": "DISCHARGEDT",
+          "as": "Date",
+          "type": "date"
+        }
+      ],
+      "rowFilter": "NOT(ISBLANK([ADMISSIONNO]))",
+      "uniqueColumn": "Ref"
+    },
+    {
+      "required": true,
+      "headerRow": 3,
+      "calculated": [
+        {
+          "as": "Amount",
+          "formula": "[GrossAmount]-[Concession]",
+          "type": "money"
+        }
+      ],
+      "id": "ipGeneralBill",
+      "label": "IP General Bill",
+      "match": {
+        "namePattern": "IP General Bill Breakup",
+        "requiredHeaders": [
+          "DOCTORNAME",
+          "DEPARTMENTNAME",
+          "ORGNAME",
+          "BILLNO",
+          "BILLDT",
+          "GROSSAMOUNT",
+          "CONCESSION",
+          "BILLSTATUS"
+        ]
+      },
+      "sheet": {
+        "name": "Sheet1"
+      },
+      "columns": [
+        {
+          "from": "DOCTORNAME",
+          "as": "Doctor",
+          "type": "text"
+        },
+        {
+          "from": "DEPARTMENTNAME",
+          "as": "Department",
+          "type": "text"
+        },
+        {
+          "from": "ORGNAME",
+          "as": "Sponsor",
+          "type": "text"
+        },
+        {
+          "from": "BILLNO",
+          "as": "Ref",
+          "type": "text"
+        },
+        {
+          "from": "BILLDT",
+          "as": "Date",
+          "type": "date"
+        },
+        {
+          "from": "GROSSAMOUNT",
+          "as": "GrossAmount",
+          "type": "money"
+        },
+        {
+          "from": "CONCESSION",
+          "as": "Concession",
+          "type": "money"
+        },
+        {
+          "from": "BILLSTATUS",
+          "as": "BillStatus",
+          "type": "text"
+        }
+      ],
+      "uniqueColumn": "Ref"
+    },
+    {
+      "required": true,
+      "headerRow": 3,
+      "calculated": [],
+      "id": "ipBillBreakups",
+      "label": "IP Bill Breakups",
+      "match": {
+        "namePattern": "IP Bill Breakups",
+        "requiredHeaders": [
+          "DOCTORNAME",
+          "DEPARTMENTNAME",
+          "ORGANIZATIONNAME",
+          "BILLNO",
+          "BILLDT",
+          "PHARMACY",
+          "PHARPURCAMOUNT"
+        ]
+      },
+      "sheet": {
+        "name": "Sheet1"
+      },
+      "columns": [
+        {
+          "from": "DOCTORNAME",
+          "as": "Doctor",
+          "type": "text"
+        },
+        {
+          "from": "DEPARTMENTNAME",
+          "as": "Department",
+          "type": "text"
+        },
+        {
+          "from": "ORGANIZATIONNAME",
+          "as": "Sponsor",
+          "type": "text"
+        },
+        {
+          "from": "BILLNO",
+          "as": "Ref",
+          "type": "text"
+        },
+        {
+          "from": "BILLDT",
+          "as": "Date",
+          "type": "date"
+        },
+        {
+          "from": "PHARMACY",
+          "as": "IPPharmacy",
+          "type": "money"
+        },
+        {
+          "from": "PHARPURCAMOUNT",
+          "as": "IPPharmacyCost",
+          "type": "money"
+        }
+      ]
+    },
+    {
+      "required": true,
+      "headerRow": 3,
+      "calculated": [],
+      "id": "opBilling",
+      "label": "OP Billing",
+      "match": {
+        "namePattern": "OP Billing Report",
+        "requiredHeaders": [
+          "DOCTORNAME",
+          "DEPARTMENTNAME",
+          "ORGANIZATIONNAME",
+          "UMRNO",
+          "BILLNO",
+          "BILLDT",
+          "NETAMOUNT"
+        ]
+      },
+      "sheet": {
+        "name": "Sheet1"
+      },
+      "columns": [
+        {
+          "from": "DOCTORNAME",
+          "as": "Doctor",
+          "type": "text"
+        },
+        {
+          "from": "DEPARTMENTNAME",
+          "as": "Department",
+          "type": "text"
+        },
+        {
+          "from": "ORGANIZATIONNAME",
+          "as": "Sponsor",
+          "type": "text"
+        },
+        {
+          "from": "UMRNO",
+          "as": "UMRNO",
+          "type": "text"
+        },
+        {
+          "from": "BILLNO",
+          "as": "Ref",
+          "type": "text"
+        },
+        {
+          "from": "BILLDT",
+          "as": "Date",
+          "type": "date"
+        },
+        {
+          "from": "NETAMOUNT",
+          "as": "Amount",
+          "type": "money"
+        }
+      ],
+      "rowFilter": "NOT(ISBLANK([BILLNO]))",
+      "uniqueColumn": "Ref"
+    },
+    {
+      "required": true,
+      "headerRow": 3,
+      "calculated": [],
+      "id": "opConsultations",
+      "label": "OP Consultations",
+      "match": {
+        "namePattern": "OP Consultations Report",
+        "requiredHeaders": [
+          "DOCTORNAME",
+          "DEPARTMENTNAME",
+          "ORGANIZATIONNAME",
+          "UMRNO",
+          "CONSULTATIONNO",
+          "CONSULTATIONDT",
+          "Net Amount"
+        ]
+      },
+      "sheet": {
+        "name": "Sheet1"
+      },
+      "columns": [
+        {
+          "from": "DOCTORNAME",
+          "as": "Doctor",
+          "type": "text"
+        },
+        {
+          "from": "DEPARTMENTNAME",
+          "as": "Department",
+          "type": "text"
+        },
+        {
+          "from": "ORGANIZATIONNAME",
+          "as": "Sponsor",
+          "type": "text"
+        },
+        {
+          "from": "UMRNO",
+          "as": "UMRNO",
+          "type": "text"
+        },
+        {
+          "from": "CONSULTATIONNO",
+          "as": "Ref",
+          "type": "text"
+        },
+        {
+          "from": "CONSULTATIONDT",
+          "as": "Date",
+          "type": "date"
+        },
+        {
+          "from": "Net Amount",
+          "as": "Amount",
+          "type": "money"
+        }
+      ],
+      "rowFilter": "NOT(ISBLANK([CONSULTATIONNO]))",
+      "uniqueColumn": "Ref"
+    },
+    {
+      "required": true,
+      "headerRow": 3,
+      "calculated": [],
+      "id": "opPharmacy",
+      "label": "OP Pharmacy",
+      "match": {
+        "namePattern": "gst op pharmacy sales",
+        "requiredHeaders": [
+          "UMRNO",
+          "ADMNNO",
+          "ORGANIZATIONNAME",
+          "BILLNO",
+          "BILLDT",
+          "SALEVALUE_BEFORETAX",
+          "PURCHASEVALUE_BEFORE_TAX"
+        ]
+      },
+      "sheet": {
+        "name": "OP pharmacy sales data"
+      },
+      "columns": [
+        {
+          "from": "UMRNO",
+          "as": "UMRNO",
+          "type": "text"
+        },
+        {
+          "from": "ADMNNO",
+          "as": "AdmissionNo",
+          "type": "text"
+        },
+        {
+          "from": "ORGANIZATIONNAME",
+          "as": "Sponsor",
+          "type": "text"
+        },
+        {
+          "from": "BILLNO",
+          "as": "Ref",
+          "type": "text"
+        },
+        {
+          "from": "BILLDT",
+          "as": "Date",
+          "type": "date"
+        },
+        {
+          "from": "SALEVALUE_BEFORETAX",
+          "as": "Amount",
+          "type": "money"
+        },
+        {
+          "from": "PURCHASEVALUE_BEFORE_TAX",
+          "as": "Cost",
+          "type": "money"
+        }
+      ],
+      "rowFilter": "ISBLANK([ADMNNO])"
+    },
+    {
+      "required": true,
+      "headerRow": 3,
+      "calculated": [
+        {
+          "as": "Amount",
+          "formula": "-[SALEVALUE_BEFORETAX]",
+          "type": "money"
+        }
+      ],
+      "id": "opReturns",
+      "label": "OP Returns",
+      "match": {
+        "namePattern": "op returns report",
+        "requiredHeaders": [
+          "UMRNO",
+          "ADMISSIONNO",
+          "ORGANIZATIONNAME",
+          "ORIGINAL_BILLNO",
+          "BILLDT",
+          "SALEVALUE_BEFORETAX"
+        ]
+      },
+      "sheet": {
+        "name": "Sheet1"
+      },
+      "columns": [
+        {
+          "from": "UMRNO",
+          "as": "UMRNO",
+          "type": "text"
+        },
+        {
+          "from": "ADMISSIONNO",
+          "as": "AdmissionNo",
+          "type": "text"
+        },
+        {
+          "from": "ORGANIZATIONNAME",
+          "as": "Sponsor",
+          "type": "text"
+        },
+        {
+          "from": "ORIGINAL_BILLNO",
+          "as": "Ref",
+          "type": "text"
+        },
+        {
+          "from": "BILLDT",
+          "as": "Date",
+          "type": "date"
+        },
+        {
+          "from": "SALEVALUE_BEFORETAX",
+          "as": "ReturnValue",
+          "type": "money"
+        }
+      ],
+      "rowFilter": "ISBLANK([ADMISSIONNO])"
+    },
+    {
+      "required": false,
+      "headerRow": "auto",
+      "calculated": [],
+      "id": "costs",
+      "label": "Costs",
+      "match": {
+        "namePattern": "Costs",
+        "requiredHeaders": [
+          "Doctor",
+          "Departmental Issues Cost",
+          "Salary Cost",
+          "Incentives",
+          "Professional Fee"
+        ]
+      },
+      "sheet": {},
+      "columns": [
+        {
+          "from": "Doctor",
+          "as": "Doctor",
+          "type": "text"
+        },
+        {
+          "from": "Departmental Issues Cost",
+          "as": "Departmental Issues Cost",
+          "type": "money"
+        },
+        {
+          "from": "Salary Cost",
+          "as": "Salary Cost",
+          "type": "money"
+        },
+        {
+          "from": "Incentives",
+          "as": "Incentives",
+          "type": "money"
+        },
+        {
+          "from": "Professional Fee",
+          "as": "Professional Fee",
+          "type": "money"
+        }
+      ]
+    }
+  ],
+  "cleanup": [
+    {
+      "column": "Sponsor",
+      "normalize": {
+        "trim": true,
+        "collapseSpaces": true,
+        "ignoreCase": true,
+        "removeChars": ""
+      },
+      "displayCase": "asIs",
+      "aliases": []
+    }
+  ],
+  "lookups": [
+    {
+      "label": "OP Pharmacy attribution",
+      "target": {
+        "source": "opPharmacy",
+        "column": "Doctor",
+        "key": "UMRNO",
+        "date": "Date"
+      },
+      "from": {
+        "source": "opConsultations",
+        "key": "UMRNO",
+        "value": "Doctor",
+        "date": "Date",
+        "extraValues": [
+          {
+            "from": "Department",
+            "as": "Department"
+          }
+        ]
+      },
+      "onlyWhen": "ISBLANK([AdmissionNo])",
+      "pick": "latestOnOrBefore",
+      "notFoundValue": "Pharmacy – Unattributed",
+      "writeStatusColumn": "Attribution"
+    },
+    {
+      "label": "OP Returns attribution",
+      "target": {
+        "source": "opReturns",
+        "column": "Doctor",
+        "key": "UMRNO",
+        "date": "Date"
+      },
+      "from": {
+        "source": "opConsultations",
+        "key": "UMRNO",
+        "value": "Doctor",
+        "date": "Date",
+        "extraValues": [
+          {
+            "from": "Department",
+            "as": "Department"
+          }
+        ]
+      },
+      "onlyWhen": "ISBLANK([AdmissionNo])",
+      "pick": "latestOnOrBefore",
+      "notFoundValue": "Pharmacy – Unattributed",
+      "writeStatusColumn": "Attribution"
+    }
+  ],
+  "report": {
+    "groupBy": [
+      "Sponsor",
+      "Month"
+    ],
+    "columns": [
+      {
+        "kind": "serial",
+        "name": "S.No."
+      },
+      {
+        "kind": "group",
+        "name": "Sponsor Name",
+        "from": "Sponsor"
+      },
+      {
+        "kind": "group",
+        "name": "Month",
+        "from": "Month"
+      },
+      {
+        "kind": "aggregate",
+        "name": "IP Count",
+        "agg": "SUM",
+        "of": "IPCount",
+        "where": "[Source]=\"IP Discharge\"",
+        "type": "number"
+      },
+      {
+        "kind": "aggregate",
+        "name": "IP Revenue",
+        "agg": "SUM",
+        "of": "Amount",
+        "where": "[Source]=\"IP General Bill\"",
+        "type": "money"
+      },
+      {
+        "kind": "aggregate",
+        "name": "OP Revenue",
+        "agg": "SUM",
+        "of": "Amount",
+        "where": "[Source]=\"OP Billing\"",
+        "type": "money"
+      },
+      {
+        "kind": "aggregate",
+        "name": "OP Pharmacy",
+        "agg": "SUM",
+        "of": "Amount",
+        "where": "OR([Source]=\"OP Pharmacy\",[Source]=\"OP Returns\")",
+        "type": "money"
+      },
+      {
+        "kind": "formula",
+        "name": "Total Revenue",
+        "formula": "[IP Revenue]+[OP Revenue]+[OP Pharmacy]",
+        "type": "money"
+      },
+      {
+        "kind": "aggregate",
+        "name": "OP Pharmacy Cost",
+        "agg": "SUM",
+        "of": "Cost",
+        "where": "[Source]=\"OP Pharmacy\"",
+        "type": "money"
+      },
+      {
+        "kind": "aggregate",
+        "name": "IP Pharmacy revenue Net",
+        "agg": "SUM",
+        "of": "IPPharmacy",
+        "type": "money"
+      },
+      {
+        "kind": "aggregate",
+        "name": "Ip Pharmacy Cost",
+        "agg": "SUM",
+        "of": "IPPharmacyCost",
+        "type": "money"
+      },
+      {
+        "kind": "formula",
+        "name": "Gross Profit",
+        "formula": "[Total Revenue]-[OP Pharmacy Cost]-[Ip Pharmacy Cost]",
+        "type": "money"
+      }
+    ],
+    "totalsRow": true
+  },
+  "output": {
+    "mode": "template",
+    "templateName": "Sponsor-wise Revenue Report.xlsx",
+    "templateBase64": "",
+    "headerRow": 4,
+    "keepTemplateFormulas": true,
+    "includeChecksSheet": true,
+    "includeCombinedSheet": false
+  },
+  "checks": {
+    "tieOuts": [
+      {
+        "label": "OP Billing total",
+        "source": "opBilling",
+        "column": "Amount",
+        "reportColumn": "OP Revenue",
+        "tolerance": 1
+      }
+    ]
+  }
+}

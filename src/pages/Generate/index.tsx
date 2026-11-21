@@ -11,6 +11,8 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { bytesToBase64 } from '@/lib/base64';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { Recipe } from '@/recipe/schema';
 import { NOT_USED, type SourceSlot } from './assignments';
@@ -54,6 +56,35 @@ function SlotRow({ slot }: { slot: SourceSlot }) {
   );
 }
 
+/** A starter recipe has no template yet: ask for it here, once, and keep it inside the recipe. */
+function TemplateNeeded({ recipe }: { recipe: Recipe }) {
+  if (recipe.output.mode !== 'template' || recipe.output.templateBase64 !== '') return null;
+  const name = recipe.output.templateName || 'the Excel template';
+
+  async function add(files: File[]) {
+    const file = files[0];
+    if (!file || recipe.output.mode !== 'template') return;
+    if (!/\.xlsx$/i.test(file.name)) {
+      toast.error('Please choose an .xlsx file.');
+      return;
+    }
+    const base64 = bytesToBase64(new Uint8Array(await file.arrayBuffer()));
+    await useLibrary.getState().saveRecipe({ ...recipe, output: { ...recipe.output, templateName: file.name, templateBase64: base64 } });
+    toast.success(`${file.name} is saved in this recipe. You will not need to add it again.`);
+  }
+
+  return (
+    <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
+      <CardContent className="space-y-3">
+        <p className="text-sm">
+          <b>This report fills {name}.</b> Add that file once. It is saved inside the recipe, so next month you only add the exports.
+        </p>
+        <FileDrop multiple={false} accept=".xlsx" compact title="Add the Excel template" hint="Your own .xlsx file with the report headings" onFiles={(f) => void add(f)} />
+      </CardContent>
+    </Card>
+  );
+}
+
 function Picker() {
   const recipes = useLibrary((s) => s.recipes);
   const status = useLibrary((s) => s.status);
@@ -94,7 +125,8 @@ function Generator({ recipe }: { recipe: Recipe }) {
 
   const slots = slotsFor(recipe, g.items, g.manual);
   const emptyParams = recipe.parameters.filter((p) => (g.params[p.name] ?? '').trim() === '');
-  const canRun = slots.ready && g.items.length > 0 && emptyParams.length === 0 && !g.running && g.reading === null;
+  const templateMissing = recipe.output.mode === 'template' && recipe.output.templateBase64 === '';
+  const canRun = slots.ready && g.items.length > 0 && emptyParams.length === 0 && !templateMissing && !g.running && g.reading === null;
 
   const fileSource = (name: string): string => {
     const slot = slots.slots.find((s) => s.files.includes(name));
@@ -124,6 +156,8 @@ function Generator({ recipe }: { recipe: Recipe }) {
         </div>
       </div>
 
+      <TemplateNeeded recipe={recipe} />
+
       <Step n={1} title="Add this month's files">
         <FileDrop onFiles={(f) => void g.addFiles(f)} title="Choose the Excel files" hint="Add all of them at once. The app works out which is which." disabled={g.running} />
         {g.reading && <ProgressBar fraction={0.5} label={g.reading} />}
@@ -147,6 +181,7 @@ function Generator({ recipe }: { recipe: Recipe }) {
               {g.items.map(({ file }) => {
                 const current = fileSource(file.name);
                 const unplaced = slots.unplaced.find((u) => u.fileName === file.name);
+                const ignored = slots.ignored.includes(file.name);
                 return (
                   <li key={file.name} className={cn('space-y-2 rounded-lg border p-3', unplaced && 'border-amber-500/50 bg-amber-50 dark:bg-amber-950/30')}>
                     <div className="flex items-start gap-2">
@@ -157,6 +192,7 @@ function Generator({ recipe }: { recipe: Recipe }) {
                       </Button>
                     </div>
                     {unplaced && <p className="text-xs text-amber-900 dark:text-amber-200">{unplaced.reason}</p>}
+                    {ignored && <p className="text-xs text-muted-foreground">This file will not be used. It does not match any source of the recipe. If it should be used, choose what it is.</p>}
                     <NativeSelect value={current} onChange={(e) => g.setManual(file.name, e.target.value)} aria-label={`What ${file.name} is`} disabled={g.running}>
                       {current === CHOOSE && <option value={CHOOSE}>Choose what this file is…</option>}
                       {recipe.sources.map((s) => (
@@ -193,11 +229,13 @@ function Generator({ recipe }: { recipe: Recipe }) {
         </Button>
         {!canRun && !g.running && (
           <p className="text-sm text-muted-foreground">
-            {g.items.length === 0
+            {templateMissing
+              ? 'Add the Excel template at the top first.'
+              : g.items.length === 0
               ? 'Add the files first.'
               : !slots.ready
                 ? slots.unplaced.length > 0
-                  ? 'Say what each highlighted file is (or leave it out).'
+                  ? 'Say what each highlighted file is.'
                   : 'Some files are missing or doubled. See the list above.'
                 : emptyParams.length > 0
                   ? `Fill in: ${emptyParams.map((p) => p.label || p.name).join(', ')}.`

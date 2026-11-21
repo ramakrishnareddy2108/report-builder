@@ -20,6 +20,8 @@ export type GenerateInput = {
   params: ParamValues;
   /** The uploaded files, already opened: which file feeds which source. */
   files: { sourceId: string; fileName: string; workbook: XLSX.WorkBook }[];
+  /** Uploaded files that no source uses. They are listed in the Checks, never dropped silently. */
+  ignoredFiles?: string[];
 };
 
 export type GenerateResult = {
@@ -120,11 +122,11 @@ export async function generate(input: GenerateInput, onProgress: GenerateProgres
   const looked = { results: prepared.lookups };
 
   if (prepared.stopped) {
-    const checks = buildChecks({ recipe, issues, sources, combinedRows: table.rows.length, cleanup: prepared.cleanup, lookups: prepared.lookups, report: null });
+    const checks = buildChecks({ recipe, ignoredFiles: input.ignoredFiles, issues, sources, combinedRows: table.rows.length, cleanup: prepared.cleanup, lookups: prepared.lookups, report: null });
     return { canDownload: false, report: null, combined: table, checks, sources, cleanup: prepared.cleanup, lookups: prepared.lookups, workbookBytes: null, templateMapping: null };
   }
   const finishEarly = (cleanupReports: CleanupReport[] = [], lookups: LookupResult[] = []): GenerateResult => {
-    const checks = buildChecks({ recipe, issues, sources, combinedRows: table.rows.length, cleanup: cleanupReports, lookups, report: null });
+    const checks = buildChecks({ recipe, ignoredFiles: input.ignoredFiles, issues, sources, combinedRows: table.rows.length, cleanup: cleanupReports, lookups, report: null });
     return { canDownload: false, report: null, combined: table, checks, sources, cleanup: cleanupReports, lookups, workbookBytes: null, templateMapping: null };
   };
 
@@ -143,7 +145,7 @@ export async function generate(input: GenerateInput, onProgress: GenerateProgres
   } catch (err) {
     if (!(err instanceof TemplateError)) throw err;
     issues.push({ level: 'error', message: err.message });
-    const checks = buildChecks({ recipe, issues, sources, combinedRows: table.rows.length, cleanup: cleaned.reports, lookups: looked.results, report });
+    const checks = buildChecks({ recipe, ignoredFiles: input.ignoredFiles, issues, sources, combinedRows: table.rows.length, cleanup: cleaned.reports, lookups: looked.results, report });
     return { canDownload: false, report, combined: table, checks, sources, cleanup: cleaned.reports, lookups: looked.results, workbookBytes: null, templateMapping: null };
   }
 
@@ -151,6 +153,7 @@ export async function generate(input: GenerateInput, onProgress: GenerateProgres
   onProgress({ stage: 'Running checks', fraction: 0.93 });
   const checks = buildChecks({
     recipe,
+    ignoredFiles: input.ignoredFiles,
     issues,
     sources,
     combinedRows: table.rows.length,

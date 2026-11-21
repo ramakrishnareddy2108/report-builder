@@ -37,6 +37,8 @@ export type ChecksInput = {
   cleanup: readonly CleanupReport[];
   lookups: readonly LookupResult[];
   report: ReportResult | null;
+  /** Uploaded files that no source used. */
+  ignoredFiles?: readonly string[];
   /** Notes from filling the template (including the formula cross-check). */
   templateNotes?: readonly { level: IssueLevel; message: string }[];
 };
@@ -155,6 +157,15 @@ export function buildChecks(input: ChecksInput): Check[] {
         sourceId: s.sourceId,
       });
     }
+  }
+
+  if (input.ignoredFiles && input.ignoredFiles.length > 0) {
+    checks.push({
+      level: 'warning',
+      title: 'Files not used',
+      message: `${plural(input.ignoredFiles.length, 'uploaded file')} did not match any source and ${input.ignoredFiles.length === 1 ? 'was' : 'were'} not used: ${input.ignoredFiles.join(', ')}. If one of them should be in the report, say what it is on the Generate page.`,
+      rows: input.ignoredFiles.length,
+    });
   }
 
   checks.push({

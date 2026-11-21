@@ -37,19 +37,32 @@ describe('file slots on the Generate page', () => {
     expect(s.ready).toBe(false);
   });
 
-  it('a file that fits nothing is unplaced until the user chooses; leaving it out is a choice too', () => {
+  it('a file that fits nothing is not used, does not block, and can still be placed by hand', () => {
     const items = [...all, probe('Mystery.xlsx', ['A'])];
     const auto = assignFiles(items, R);
     const names = items.map((i) => i.name);
-    const unplaced = buildSlots(R, names, auto, {});
-    expect(unplaced.ready).toBe(false);
-    expect(unplaced.unplaced.map((u) => u.fileName)).toEqual(['Mystery.xlsx']);
-    expect(unplaced.unplaced[0]?.reason).toMatch(/does not look like any source/);
+    const base = buildSlots(R, names, auto, {});
+    expect(base.ready).toBe(true);
+    expect(base.ignored).toEqual(['Mystery.xlsx']);
+    expect(base.unplaced).toEqual([]);
 
-    expect(buildSlots(R, names, auto, { 'Mystery.xlsx': NOT_USED }).ready).toBe(true);
     const placed = buildSlots(R, names, auto, { 'Mystery.xlsx': 'costs' });
-    expect(placed.ready).toBe(true);
+    expect(placed.ignored).toEqual([]);
     expect(placed.slots.find((x) => x.sourceId === 'costs')?.files).toEqual(['Mystery.xlsx']);
+    expect(buildSlots(R, names, auto, { 'Mystery.xlsx': NOT_USED }).ignored).toEqual(['Mystery.xlsx']);
+  });
+
+  it('a file that could be two sources must be chosen: it blocks until then', () => {
+    const both = probe('Report.xlsx', ['BILLNO', 'NETAMOUNT', 'CONSULTATIONNO']);
+    const items = [billing.name === both.name ? billing : both, consult, pharmacy, returns];
+    const names = items.map((i) => i.name);
+    const auto = assignFiles(items, R);
+    const s = buildSlots(R, names, auto, {});
+    expect(s.ready).toBe(false);
+    expect(s.unplaced[0]).toMatchObject({ fileName: 'Report.xlsx', candidates: ['opBilling', 'opConsultations'] });
+    const chosen = buildSlots(R, names, auto, { 'Report.xlsx': 'opBilling' });
+    expect(chosen.slots.find((x) => x.sourceId === 'opBilling')?.files).toEqual(['Report.xlsx']);
+    expect(chosen.ready).toBe(true);
   });
 
   it('two files for one source are a conflict, and the user settles it', () => {

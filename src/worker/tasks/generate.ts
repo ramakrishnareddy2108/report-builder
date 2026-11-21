@@ -19,6 +19,8 @@ export type GenerateRequest = {
   recipe: Recipe;
   params: ParamValues;
   assignments: { sourceId: string; file: File }[];
+  /** Names of uploaded files that no source uses. */
+  ignoredFiles?: string[];
 };
 
 export type GenerateTaskResult = {
@@ -46,7 +48,7 @@ export async function generateTask(req: GenerateRequest, onProgress: (p: TaskPro
     files.push({ sourceId: a.sourceId, fileName: a.file.name, workbook });
   }
 
-  const result = await generate({ recipe: req.recipe, params: req.params, files }, (p) => onProgress({ ...p, fraction: 0.1 + p.fraction * 0.9 }));
+  const result = await generate({ recipe: req.recipe, params: req.params, files, ignoredFiles: req.ignoredFiles }, (p) => onProgress({ ...p, fraction: 0.1 + p.fraction * 0.9 }));
   setLastCombined(result.combined);
   return {
     canDownload: result.canDownload,

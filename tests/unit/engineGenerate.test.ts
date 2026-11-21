@@ -128,6 +128,14 @@ describe('end to end: synthetic month', () => {
     expect(r.checks.some((c) => c.level === 'info' && /Costs: optional source, no file added/.test(c.message))).toBe(true);
   });
 
+  it('uploaded files that no source used are listed as a warning, not dropped silently', async () => {
+    const r = await generate({ ...input(recipe()), ignoredFiles: ['IP Admissions report oct2026.xlsx'] });
+    expect(r.canDownload).toBe(true);
+    const c = r.checks.find((x) => x.title === 'Files not used');
+    expect(c?.level).toBe('warning');
+    expect(c?.message).toBe('1 uploaded file did not match any source and was not used: IP Admissions report oct2026.xlsx. If one of them should be in the report, say what it is on the Generate page.');
+  });
+
   it('a missing column blocks the download and names the source and column', async () => {
     const r2 = recipe();
     r2.sources = r2.sources.map((s) => (s.id === 'opBilling' ? { ...s, columns: s.columns.map((c) => (c.from === 'NETAMOUNT' ? { ...c, from: 'NET AMOUNT' } : c)) } : s));

@@ -100,6 +100,7 @@ export const useGenerate = create<GenerateState>()((set, get) => ({
         {
           recipe,
           params,
+          ignoredFiles: slots.ignored,
           assignments: slots.assignments.map((a) => ({ sourceId: a.sourceId, file: (items.find((i) => i.file.name === a.fileName) as Item).file })),
         },
         (progress) => set({ progress }),
