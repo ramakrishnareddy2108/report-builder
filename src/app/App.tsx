@@ -3,31 +3,15 @@ import { Suspense, useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PAGE_COMPONENTS } from '@/pages';
-import { isFileSystemAccessSupported } from '@/storage/workspace';
+import { BottomNav } from './BottomNav';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { useSettings } from './settingsStore';
-import { useAppStore } from './store';
-import { UnsupportedBrowser } from './UnsupportedBrowser';
-import { useWorkspace } from './useWorkspace';
-import { restoreWorkspace } from './workspaceSession';
+import { listenToHash, useAppStore } from './store';
 
 export function App() {
-  const page = useAppStore((s) => s.page);
-  const supported = isFileSystemAccessSupported();
-
-  useEffect(() => {
-    if (supported) void restoreWorkspace();
-  }, [supported]);
-
-  // Settings are read once per connected folder and shared by every page.
-  const ws = useWorkspace();
-  useEffect(() => {
-    if (ws) void useSettings.getState().load(ws);
-  }, [ws]);
-
-  if (!supported) return <UnsupportedBrowser />;
+  const page = useAppStore((s) => s.route.page);
+  useEffect(() => listenToHash(), []);
 
   const Page = PAGE_COMPONENTS[page];
 
@@ -43,11 +27,11 @@ export function App() {
       >
         Skip to the page
       </a>
-      <div className="flex h-screen bg-background text-foreground">
+      <div className="flex h-dvh bg-background text-foreground">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <Header />
-          <main id="main" tabIndex={-1} className="flex-1 overflow-auto p-6 outline-none">
+          <main id="main" tabIndex={-1} className="flex-1 overflow-auto p-4 pb-24 outline-none md:p-6 md:pb-6">
             {/* A new key per page clears an error from the page before. */}
             <ErrorBoundary key={page}>
               <Suspense
@@ -64,6 +48,7 @@ export function App() {
           </main>
         </div>
       </div>
+      <BottomNav />
       <Toaster />
     </TooltipProvider>
   );

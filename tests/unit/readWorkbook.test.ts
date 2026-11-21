@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { sha256Hex } from '@/excel/fingerprint';
 import { listSheets, openWorkbook, readSheetRows, WorkbookReadError } from '@/excel/readWorkbook';
 import { consultationsWorkbook } from '../helpers/syntheticWorkbook';
 
@@ -71,13 +70,5 @@ describe('readSheetRows', () => {
 
   it('names the available sheets when the sheet is missing', () => {
     expect(() => readSheetRows(wb, 'Nope')).toThrow(/“Nope” was not found.*“Sheet1”, “Sheet2”, “Offset”/);
-  });
-});
-
-describe('sha256Hex', () => {
-  it('matches the known digest of "abc"', async () => {
-    expect(await sha256Hex(new TextEncoder().encode('abc'))).toBe(
-      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
-    );
   });
 });

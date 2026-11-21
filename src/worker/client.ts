@@ -1,14 +1,7 @@
 // Page-side wrapper around the worker: one shared worker, promise per task.
 
 import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
-import type { CollectNamesRequest, CollectNamesResult } from './tasks/collectNames';
-import type { RunOutput } from '@/core/runMonth';
-import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
-import type { BuildReportsRequest, BuildReportsResult, CheckTemplatesRequest, InspectTemplateRequest, InspectTemplateResult, ReadReportRequest, ReadReportResult } from './tasks/reports';
-import type { CompareExportInput } from '@/excel/compareSheet';
-import type { TableExportInput } from '@/excel/tableSheet';
-import type { CheckResult } from '@/core/types';
-import type { RunMonthRequest } from './tasks/runMonth';
+import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 type Pending = {
   resolve: (result: unknown) => void;
@@ -27,7 +20,7 @@ function failAll(message: string) {
 
 function getWorker(): Worker {
   if (worker) return worker;
-  const w = new Worker(new URL('./runMonth.worker.ts', import.meta.url), { type: 'module' });
+  const w = new Worker(new URL('./generate.worker.ts', import.meta.url), { type: 'module' });
   w.addEventListener('message', (e: MessageEvent<WorkerResponse>) => {
     const msg = e.data;
     const p = pending.get(msg.id);
@@ -61,44 +54,6 @@ export function runTask<K extends TaskName>(
   });
 }
 
-export function readFileInWorker(
-  request: ReadFileRequest,
-  onProgress?: (p: TaskProgress) => void,
-): Promise<ReadFileResult> {
-  return runTask('readFile', request, onProgress);
-}
-
-export function collectNamesInWorker(
-  request: CollectNamesRequest,
-  onProgress?: (p: TaskProgress) => void,
-): Promise<CollectNamesResult> {
-  return runTask('collectNames', request, onProgress);
-}
-
-export function runMonthInWorker(request: RunMonthRequest, onProgress?: (p: TaskProgress) => void): Promise<RunOutput> {
-  return runTask('runMonth', request, onProgress);
-}
-
-export function checkTemplatesInWorker(request: CheckTemplatesRequest): Promise<CheckResult[]> {
-  return runTask('checkTemplates', request);
-}
-
-export function buildReportsInWorker(request: BuildReportsRequest, onProgress?: (p: TaskProgress) => void): Promise<BuildReportsResult> {
-  return runTask('buildReports', request, onProgress);
-}
-
-export function inspectTemplateInWorker(request: InspectTemplateRequest): Promise<InspectTemplateResult> {
-  return runTask('inspectTemplate', request);
-}
-
-export function readReportInWorker(request: ReadReportRequest): Promise<ReadReportResult> {
-  return runTask('readReport', request);
-}
-
-export function exportCompareInWorker(request: CompareExportInput): Promise<Uint8Array> {
-  return runTask('exportCompare', request);
-}
-
-export function exportTableInWorker(request: TableExportInput): Promise<Uint8Array> {
-  return runTask('exportTable', request);
+export function inspectFileInWorker(request: InspectFileRequest, onProgress?: (p: TaskProgress) => void): Promise<InspectFileResult> {
+  return runTask('inspectFile', request, onProgress);
 }

@@ -1,14 +1,7 @@
 // Messages between the page and the worker. Each request has an id; the
 // worker answers with any number of progress messages, then one result or error.
 
-import type { CollectNamesRequest, CollectNamesResult } from './tasks/collectNames';
-import type { RunOutput } from '@/core/runMonth';
-import type { ReadFileRequest, ReadFileResult } from './tasks/readFile';
-import type { BuildReportsRequest, BuildReportsResult, CheckTemplatesRequest, InspectTemplateRequest, InspectTemplateResult, ReadReportRequest, ReadReportResult } from './tasks/reports';
-import type { CompareExportInput } from '@/excel/compareSheet';
-import type { TableExportInput } from '@/excel/tableSheet';
-import type { CheckResult } from '@/core/types';
-import type { RunMonthRequest } from './tasks/runMonth';
+import type { InspectFileRequest, InspectFileResult } from './tasks/inspectFile';
 
 export type TaskProgress = {
   /** Short plain-language step, e.g. "Reading rows". */
@@ -18,17 +11,9 @@ export type TaskProgress = {
   detail?: string;
 };
 
-/** Every task the worker knows: request payload → result. */
+/** Every task the worker knows: request payload → result. New tasks are added here. */
 export type TaskMap = {
-  readFile: { request: ReadFileRequest; result: ReadFileResult };
-  collectNames: { request: CollectNamesRequest; result: CollectNamesResult };
-  runMonth: { request: RunMonthRequest; result: RunOutput };
-  checkTemplates: { request: CheckTemplatesRequest; result: CheckResult[] };
-  buildReports: { request: BuildReportsRequest; result: BuildReportsResult };
-  inspectTemplate: { request: InspectTemplateRequest; result: InspectTemplateResult };
-  readReport: { request: ReadReportRequest; result: ReadReportResult };
-  exportCompare: { request: CompareExportInput; result: Uint8Array };
-  exportTable: { request: TableExportInput; result: Uint8Array };
+  inspectFile: { request: InspectFileRequest; result: InspectFileResult };
 };
 export type TaskName = keyof TaskMap;
 

@@ -6,12 +6,9 @@ const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, n
   lazy(async () => ({ default: (await load())[name] }));
 
 export const PAGE_COMPONENTS: Record<PageId, ComponentType> = {
-  workspace: page(() => import('./WorkspacePage'), 'WorkspacePage'),
-  sources: page(() => import('./SourcesPage'), 'SourcesPage'),
-  doctors: page(() => import('./DoctorsPage'), 'DoctorsPage'),
-  costs: page(() => import('./CostsPage'), 'CostsPage'),
-  run: page(() => import('./RunPage'), 'RunPage'),
-  months: page(() => import('./MonthsPage'), 'MonthsPage'),
-  dashboards: page(() => import('./DashboardsPage'), 'DashboardsPage'),
-  settings: page(() => import('./SettingsPage'), 'SettingsPage'),
+  home: page(() => import('./Home'), 'HomePage'),
+  recipe: page(() => import('./RecipeBuilder'), 'RecipeBuilderPage'),
+  generate: page(() => import('./Generate'), 'GeneratePage'),
+  dashboards: page(() => import('./Dashboards'), 'DashboardsPage'),
+  help: page(() => import('./Help'), 'HelpPage'),
 };
