@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "flags": {
+    "includePendingIpBills": true,
+    "includeConsultations": false
+  },
+  "rules": [
+    {
+      "measure": "IP_COUNT",
+      "kind": "source",
+      "terms": [
+        {
+          "sourceId": "ipDischarge",
+          "value": { "type": "count" },
+          "filter": null,
+          "sign": 1,
+          "attribution": "sourceDoctor",
+          "note": "1 per discharge row"
+        }
+      ]
+    },
+    {
+      "measure": "IP_REVENUE",
+      "kind": "source",
+      "terms": [
+        {
+          "sourceId": "ipGeneralBill",
+          "value": { "type": "formula", "formula": "[grossAmount] - [concession]" },
+          "filter": "[status] <> \"PENDING\"",
+          "sign": 1,
+          "attribution": "sourceDoctor",
+          "note": "Cleared (non-pending) bills"
+        },
+        {
+          "sourceId": "ipGeneralBill",
+          "value": { "type": "formula", "formula": "[grossAmount] - [concession]" },
+          "filter": "[status] = \"PENDING\"",
+          "sign": 1,
+          "attribution": "sourceDoctor",
+          "onlyIf": { "flag": "includePendingIpBills", "is": true },
+          "note": "Pending bills, only when includePendingIpBills is on"
+        }
+      ]
+    },
+    {
+      "measure": "OP_REVENUE",
+      "kind": "source",
+      "terms": [
+        {
+          "sourceId": "opBilling",
+          "value": { "type": "field", "field": "netAmount" },
+          "filter": null,
+          "sign": 1,
+          "attribution": "sourceDoctor"
+        },
+        {
+          "sourceId": "opConsultations",
+          "value": { "type": "field", "field": "netAmount" },
+          "filter": null,
+          "sign": 1,
+          "attribution": "sourceDoctor",
+          "onlyIf": { "flag": "includeConsultations", "is": true },
+          "note": "Only when includeConsultations is on"
+        }
+      ]
+    },
+    {
+      "measure": "OP_PHARMACY",
+      "kind": "source",
+      "terms": [
+        {
+          "sourceId": "opPharmacySales",
+          "value": { "type": "field", "field": "saleValue" },
+          "filter": "ISBLANK([admissionNo])",
+          "sign": 1,
+          "attribution": "pharmacyByUmrno",
+          "note": "OP sales only (ADMNNO empty)"
+        },
+        {
+          "sourceId": "opReturns",
+          "value": { "type": "field", "field": "saleValue" },
+          "filter": "ISBLANK([admissionNo])",
+          "sign": -1,
+          "attribution": "pharmacyByUmrno",
+          "note": "OP returns (ADMISSIONNO empty) reduce OP Pharmacy"
+        }
+      ]
+    },
+    {
+      "measure": "OP_PHARMACY_COST",
+      "kind": "source",
+      "terms": [
+        {
+          "sourceId": "opPharmacySales",
+          "value": { "type": "field", "field": "purchaseValue" },
+          "filter": "ISBLANK([admissionNo])",
+          "sign": 1,
+          "attribution": "pharmacyByUmrno",
+          "note": "Same rows and attribution as OP Pharmacy sales"
+        }
+      ]
+    },
+    {
+      "measure": "IP_PHARMACY_NET",
+      "kind": "source",
+      "terms": [
+        {
+          "sourceId": "ipBillBreakups",
+          "value": { "type": "field", "field": "pharmacyAmount" },
+          "filter": null,
+          "sign": 1,
+          "attribution": "sourceDoctor"
+        }
+      ]
+    },
+    {
+      "measure": "IP_PHARMACY_COST",
+      "kind": "source",
+      "terms": [
+        {
+          "sourceId": "ipBillBreakups",
+          "value": { "type": "field", "field": "pharmacyCost" },
+          "filter": null,
+          "sign": 1,
+          "attribution": "sourceDoctor"
+        }
+      ]
+    },
+    { "measure": "DEPT_ISSUES", "kind": "costs" },
+    { "measure": "SALARY", "kind": "costs" },
+    { "measure": "INCENTIVES", "kind": "costs" },
+    { "measure": "PROF_FEE", "kind": "costs" }
+  ]
+}
