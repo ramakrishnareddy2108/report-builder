@@ -1,5 +1,7 @@
 import { ArrowLeft, Check, CircleAlert, FileSpreadsheet, Loader2, Play } from 'lucide-react';
 import { useEffect } from 'react';
+import { toast } from 'sonner';
+import { useHandoff } from '@/app/handoff';
 import { useLibrary } from '@/app/libraryStore';
 import { useAppStore } from '@/app/store';
 import { EmptyState } from '@/components/EmptyState';
@@ -9,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUnsavedWarning } from '@/lib/useUnsavedWarning';
 import { useBuilder } from './builderStore';
 import { ParametersEditor } from './ParametersEditor';
+import { loadSample } from './sample';
 import { PrepareTab } from './PrepareTab';
 import { OutputTab } from './OutputTab';
 import { ReportTab } from './ReportTab';
@@ -63,7 +66,23 @@ export function RecipeBuilderPage() {
     if (!recipeId || libraryStatus !== 'ready') return;
     const current = useBuilder.getState().recipe;
     if (current?.id === recipeId) return;
-    if (saved) useBuilder.getState().open(saved);
+    if (!saved) return;
+    useBuilder.getState().open(saved);
+
+    // "Fix mapping" from the Generate page: open that source with the new file loaded as its sample.
+    const handoff = useHandoff.getState().take(saved.id);
+    const source = handoff && saved.sources.find((s) => s.id === handoff.sourceId);
+    if (handoff && source) {
+      void loadSample(handoff.file, { sheet: source.sheet.name, headerRow: source.headerRow })
+        .then(({ sample }) => {
+          const b = useBuilder.getState();
+          b.setSample(source.id, sample);
+          b.setFocusSource(source.id);
+          b.setTab('sources');
+          toast.info(`${handoff.file.name} is loaded as the sample for ${source.label}. Pick the new columns below.`);
+        })
+        .catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'That file could not be read.'));
+    }
   }, [recipeId, libraryStatus, saved]);
 
   // Save what was typed in the last moments when leaving the page.

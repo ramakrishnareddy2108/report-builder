@@ -17,6 +17,9 @@ type BuilderState = {
   /** The tab on screen: sources, prepare, report, output or test. */
   tab: string;
   setTab: (tab: string) => void;
+  /** A source to open when the Sources tab shows (after "Fix mapping"). */
+  focusSource: string | null;
+  setFocusSource: (id: string | null) => void;
   saveState: SaveState;
   /** Why the recipe could not be saved yet (shown next to the name). */
   problem: string | null;
@@ -39,12 +42,14 @@ export const useBuilder = create<BuilderState>()((set, get) => ({
   samples: {},
   tab: 'sources',
   setTab: (tab) => set({ tab }),
+  focusSource: null,
+  setFocusSource: (focusSource) => set({ focusSource }),
   saveState: 'idle',
   problem: null,
 
   open: (recipe) => {
     if (timer) clearTimeout(timer);
-    set({ recipe: structuredClone(recipe), samples: {}, tab: 'sources', saveState: 'saved', problem: null });
+    set({ recipe: structuredClone(recipe), samples: {}, tab: 'sources', focusSource: null, saveState: 'saved', problem: null });
   },
 
   update: (mutate) => {

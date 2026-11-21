@@ -46,7 +46,8 @@ export function SourceCard({ sourceId, startOpen = false }: { sourceId: string; 
   const reloadSample = useBuilder((s) => s.reloadSample);
   const removeSample = useBuilder((s) => s.removeSample);
 
-  const [open, setOpen] = useState(startOpen);
+  const focused = useBuilder((s) => s.focusSource === sourceId);
+  const [open, setOpen] = useState(startOpen || focused);
   const [showPreview, setShowPreview] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
