@@ -6,7 +6,7 @@ They are written by `scripts/make-fixtures.ts` from `tests/helpers/monthData.ts`
 
 ```bash
 npx tsx scripts/make-fixtures.ts
-```bash
+```
 
 | Folder | What it holds |
 |---|---|
