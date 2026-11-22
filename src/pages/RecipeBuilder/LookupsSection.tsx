@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { formatINR } from '@/core/money';
 import type { LookupResult } from '@/engine/lookups';
 import { combinedColumns } from '@/recipe/columns';
-import type { LookupRule, Recipe } from '@/recipe/schema';
+import { DEFAULT_TIE_BREAK_FORMULA, type LookupRule, type Recipe } from '@/recipe/schema';
 import { useBuilder } from './builderStore';
 
 /** The common names a source gives its columns (renamed and calculated). */
@@ -58,9 +58,19 @@ function Summary({ result }: { result: LookupResult | undefined }) {
       <div className="flex flex-wrap gap-2">
         <Badge>Matched {result.byStatus.Matched.toLocaleString('en-IN')}{money('Matched')}</Badge>
         <Badge variant="secondary">Nearest record {result.byStatus.Fallback.toLocaleString('en-IN')}{money('Fallback')}</Badge>
+        <Badge variant={result.byStatus.Ambiguous > 0 ? 'destructive' : 'secondary'}>Ambiguous {result.byStatus.Ambiguous.toLocaleString('en-IN')}{money('Ambiguous')}</Badge>
         <Badge variant={result.byStatus.Unattributed > 0 ? 'destructive' : 'secondary'}>Not found {result.byStatus.Unattributed.toLocaleString('en-IN')}{money('Unattributed')}</Badge>
       </div>
       {result.skipped > 0 && <p className="text-xs text-muted-foreground">{result.skipped.toLocaleString('en-IN')} rows skipped by the “only when” rule.</p>}
+      {result.ambiguousExamples.length > 0 && (
+        <ul className="space-y-0.5 text-xs text-muted-foreground">
+          {result.ambiguousExamples.slice(0, 5).map((a, i) => (
+            <li key={i}>
+              Tie, for example: {a.key}{a.day ? ` on ${a.day}` : ''} has {a.values.join(' and ')}; written: {a.written}
+            </li>
+          ))}
+        </ul>
+      )}
       {result.notFoundKeys.length > 0 && <p className="text-xs text-muted-foreground">Not found, for example: {result.notFoundKeys.join(', ')}</p>}
     </div>
   );
@@ -168,9 +178,57 @@ function LookupCard({ index, result }: { index: number; result: LookupResult | u
         <label className="space-y-1 text-sm">
           <span className="font-medium">Note how it was found in column (optional)</span>
           <Input value={rule.writeStatusColumn ?? ''} onChange={(e) => patch((r) => (r.writeStatusColumn = e.target.value || undefined))} placeholder="e.g. Attribution" />
-          <span className="block text-xs text-muted-foreground">Writes Matched, Fallback or Unattributed.</span>
+          <span className="block text-xs text-muted-foreground">Writes Matched, Fallback, Ambiguous or Unattributed.</span>
         </label>
       </div>
+
+      {needsDates && (
+        <fieldset className="space-y-3 rounded-lg bg-muted/20 p-3">
+          <legend className="px-1 text-sm font-semibold">When one day has different values</legend>
+          <p className="text-xs text-muted-foreground">
+            For example, two consultations on the same day with two different doctors. These rows are marked Ambiguous and counted in the Checks. Matched means the day has only one value.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-sm">
+              <span className="font-medium">Which one to write</span>
+              <NativeSelect
+                value={rule.tieBreak?.method ?? 'first'}
+                onChange={(e) =>
+                  patch((r) => {
+                    const method = e.target.value as NonNullable<LookupRule['tieBreak']>['method'];
+                    r.tieBreak = { method, then: r.tieBreak?.then ?? 'first', preferFormula: method === 'preferNotMatching' ? r.tieBreak?.preferFormula || DEFAULT_TIE_BREAK_FORMULA : r.tieBreak?.preferFormula };
+                  })
+                }
+              >
+                <option value="preferNotMatching">Prefer the records where a formula is true</option>
+                <option value="first">The first one in the file</option>
+                <option value="unattributed">None: write the “not found” value</option>
+              </NativeSelect>
+            </label>
+            {rule.tieBreak?.method === 'preferNotMatching' && (
+              <label className="space-y-1 text-sm">
+                <span className="font-medium">If that does not leave one value</span>
+                <NativeSelect value={rule.tieBreak.then} onChange={(e) => patch((r) => void (r.tieBreak && (r.tieBreak.then = e.target.value as 'first' | 'unattributed')))}>
+                  <option value="first">Use the first one</option>
+                  <option value="unattributed">Write the “not found” value</option>
+                </NativeSelect>
+              </label>
+            )}
+          </div>
+          {rule.tieBreak?.method === 'preferNotMatching' && (
+            <FormulaField
+              label="Prefer a record when"
+              value={rule.tieBreak.preferFormula ?? ''}
+              onChange={(v) => patch((r) => void (r.tieBreak && (r.tieBreak.preferFormula = v)))}
+              columns={fromCols}
+              columnExists={(n) => all.some((c) => c.toUpperCase() === n.toUpperCase())}
+              placeholder={DEFAULT_TIE_BREAK_FORMULA}
+              hint="Checked on each tied record of the lookup source. Leave empty to use the standard test: not a “Consultation” or “Check Up” entry."
+              optional
+            />
+          )}
+        </fieldset>
+      )}
 
       <FormulaField
         label="Only for rows where (optional)"

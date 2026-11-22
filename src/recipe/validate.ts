@@ -66,6 +66,7 @@ export function checkRecipe(recipe: Recipe): RecipeProblem[] {
   }
   for (const t of recipe.checks.tieOuts) {
     if (!recipe.sources.some((s) => s.id === t.source)) error('output', `The tie-out “${t.label}” uses a source that is not in this recipe.`);
+    for (const id of t.alsoSources ?? []) if (!recipe.sources.some((s) => s.id === id)) error('output', `The tie-out “${t.label}” also adds up the source “${id}”, which is not in this recipe.`);
     if (!recipe.report.columns.some((c) => c.name.toUpperCase() === t.reportColumn.toUpperCase())) error('output', `The tie-out “${t.label}” compares with the report column “${t.reportColumn}”, which does not exist.`);
   }
   return out;

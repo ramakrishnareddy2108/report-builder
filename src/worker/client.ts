@@ -2,7 +2,7 @@
 
 import type { TaskMap, TaskName, TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import type { CombineRequest, CombineTaskResult } from './tasks/combine';
-import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
+import type { ExportIntermediateRequest, GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { PreviewRequest, PreviewResult } from './tasks/preview';
 import type { InspectTemplateRequest, InspectTemplateResult } from './tasks/inspectTemplate';
 import type { DashboardData } from '@/dashboard/data';
@@ -76,6 +76,11 @@ export function generateInWorker(request: GenerateRequest, onProgress?: (p: Task
 /** The combined table of the last generate run, as Excel bytes. */
 export function exportCombinedInWorker(): Promise<Uint8Array> {
   return runTask('exportCombined', null);
+}
+
+/** The intermediate workbook (one sheet per source, selected columns) of the last generate run. */
+export function exportIntermediateInWorker(request: ExportIntermediateRequest): Promise<Uint8Array> {
+  return runTask('exportIntermediate', request);
 }
 
 /** Steps 1–7 (and optionally the report) on the sample files, for the Prepare and Report tabs. */

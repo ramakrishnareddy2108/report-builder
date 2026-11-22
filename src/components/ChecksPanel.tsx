@@ -13,6 +13,7 @@ function CheckItem({ check, onFix }: { check: Check; onFix?: (check: Check) => v
   const s = STYLE[check.level];
   const Icon = s.icon;
   const details = check.details ?? [];
+  const limit = check.detailLimit ?? 25;
   return (
     <li className={cn('space-y-2 rounded-lg border p-3 text-sm', s.box)} role={check.level === 'error' ? 'alert' : undefined}>
       <div className="flex gap-2">
@@ -36,9 +37,9 @@ function CheckItem({ check, onFix }: { check: Check; onFix?: (check: Check) => v
       </div>
       {details.length > 0 && (
         <details className="pl-6">
-          <summary className="cursor-pointer text-xs font-medium">Show {details.length > 25 ? 'first 25 of ' : ''}{details.length} example{details.length === 1 ? '' : 's'}</summary>
+          <summary className="cursor-pointer text-xs font-medium">Show {details.length > limit ? `first ${limit} of ` : ''}{details.length} example{details.length === 1 ? '' : 's'}</summary>
           <ul className="mt-2 space-y-1 text-xs">
-            {details.slice(0, 25).map((d, i) => (
+            {details.slice(0, limit).map((d, i) => (
               <li key={i} className="break-words">
                 {d.file && <span className="text-muted-foreground">{d.file} </span>}
                 {d.row !== undefined && <b>row {d.row}: </b>}

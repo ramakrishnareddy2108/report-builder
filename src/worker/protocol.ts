@@ -2,7 +2,7 @@
 // worker answers with any number of progress messages, then one result or error.
 
 import type { CombineRequest, CombineTaskResult } from './tasks/combine';
-import type { GenerateRequest, GenerateTaskResult } from './tasks/generate';
+import type { ExportIntermediateRequest, GenerateRequest, GenerateTaskResult } from './tasks/generate';
 import type { PreviewRequest, PreviewResult } from './tasks/preview';
 import type { InspectTemplateRequest, InspectTemplateResult } from './tasks/inspectTemplate';
 import type { DashboardData } from '@/dashboard/data';
@@ -28,6 +28,7 @@ export type TaskMap = {
   preview: { request: PreviewRequest; result: PreviewResult };
   generate: { request: GenerateRequest; result: GenerateTaskResult };
   exportCombined: { request: null; result: Uint8Array };
+  exportIntermediate: { request: ExportIntermediateRequest; result: Uint8Array };
 };
 export type TaskName = keyof TaskMap;
 

@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Hash, Plus, Sigma, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { ReportGrid } from '@/components/ReportGrid';
+import { FormulaField } from '@/components/FormulaField';
 import { IssueList } from '@/components/IssueList';
 import { NativeSelect } from '@/components/NativeSelect';
 import { Button } from '@/components/ui/button';
@@ -149,6 +150,23 @@ export function ReportTab() {
             Add a totals row
           </label>
         </div>
+        <label className="flex min-h-10 items-start gap-3 text-sm">
+          <input type="checkbox" className="mt-0.5 size-5 accent-primary" checked={report.hideZeroRows ?? false} onChange={(e) => update((r) => void (r.report.hideZeroRows = e.target.checked))} />
+          <span>
+            Hide rows where all aggregate columns are 0
+            <span className="block text-xs text-muted-foreground">Aggregate columns are the Total columns (not formulas). The hidden rows are listed in Checks, and the totals row still counts them.</span>
+          </span>
+        </label>
+        <FormulaField
+          label="Leave out rows where… (optional)"
+          optional
+          value={report.excludeRowsWhere ?? ''}
+          onChange={(v) => update((r) => void (r.report.excludeRowsWhere = v.trim() === '' ? undefined : v))}
+          columns={all.map((c) => c.name).filter((n) => !n.startsWith('_'))}
+          columnExists={(n) => all.some((c) => c.name.toUpperCase() === n.toUpperCase())}
+          placeholder={'[Doctor]="Pharmacy – Unattributed"'}
+          hint="A formula on the combined rows, applied before the rows are grouped. Rows it is TRUE for are not in the report or its totals. They are counted, with their amounts, in Checks."
+        />
       </section>
 
       <section className="space-y-3" aria-labelledby="preview-h">
@@ -169,6 +187,8 @@ export function ReportTab() {
           <>
             <p className="text-sm text-muted-foreground">
               {reportResult.rows.length.toLocaleString('en-IN')} rows from {reportResult.inputRows.toLocaleString('en-IN')} combined rows.
+              {reportResult.hidden.length > 0 && ` ${reportResult.hidden.length.toLocaleString('en-IN')} rows hidden because all aggregate columns are 0.`}
+              {reportResult.excluded && ` ${reportResult.excluded.rows.toLocaleString('en-IN')} combined rows left out by the “leave out rows where” rule.`}
             </p>
             <ReportGrid columns={reportResult.columns} rows={reportResult.rows} totals={reportResult.totals} />
           </>

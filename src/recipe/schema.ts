@@ -48,6 +48,14 @@ export const SourceDefSchema = z.object({
    * 'Ref'. Leave it out for line-item files that repeat the bill number on purpose.
    */
   uniqueColumn: z.string().optional(),
+  /**
+   * Rows that the row filter leaves out on purpose (for example OP pharmacy sold to admitted patients, which is billed in
+   * the IP bill) are counted and their `amountColumn` is added up, then shown in the Checks as one info line.
+   * Sources with the same `title` are added together.
+   */
+  leftOutNote: z.object({ title: nonEmpty, amountColumn: z.string().optional() }).optional(),
+  /** Only for an optional source: the warning shown in the Checks when no file was added for it. */
+  missingWarning: z.string().optional(),
 });
 export type SourceDef = z.infer<typeof SourceDefSchema>;
 
@@ -57,12 +65,37 @@ export const CleanupRuleSchema = z.object({
     trim: z.literal(true),
     collapseSpaces: z.literal(true),
     ignoreCase: z.boolean(),
-    removeChars: z.string(), // e.g. '.,'
+    removeChars: z.string(), // e.g. ',' (characters taken out without leaving a space)
+    /** Turn every '.' into a space (so "K.KRISHNA" becomes "K KRISHNA", not "KKRISHNA"), then collapse spaces. */
+    dotsToSpace: z.boolean().optional(),
+    /** Take a leading "DR " (any case) off the name: "Dr Srimannarayana" becomes "Srimannarayana". */
+    stripDrPrefix: z.boolean().optional(),
+    /** Take a trailing text such as " (REVIEW)" off the name (any case). Off when `enabled` is false. */
+    stripSuffix: z.object({ enabled: z.boolean(), text: z.string() }).optional(),
   }),
   displayCase: z.enum(['asIs', 'upper', 'title']),
   aliases: z.array(z.object({ to: nonEmpty, from: z.array(z.string()) })),
 });
 export type CleanupRule = z.infer<typeof CleanupRuleSchema>;
+
+/**
+ * What to do when the record chosen by `latestOnOrBefore` has several different values on the same day
+ * (for example two consultations on one date with two different doctors).
+ *   preferNotMatching  prefer the records for which `preferFormula` is TRUE (a formula over the lookup source's row);
+ *                      if that does not leave exactly one value, do what `then` says
+ *   first              take the first of them in file order
+ *   unattributed       write the rule's "not found" value
+ * The row's status is 'Ambiguous' in every case, so the Checks can count it.
+ */
+export const TieBreakSchema = z.object({
+  method: z.enum(['preferNotMatching', 'first', 'unattributed']),
+  preferFormula: z.string().optional(),
+  then: z.enum(['first', 'unattributed']),
+});
+export type TieBreak = z.infer<typeof TieBreakSchema>;
+
+/** The default "preferred" test: a real doctor, not the generic "Consultation" or "Check Up" entries. */
+export const DEFAULT_TIE_BREAK_FORMULA = 'AND(NOT(CONTAINS([Doctor],"Consultation")),NOT(CONTAINS([Doctor],"Check Up")))';
 
 export const LookupRuleSchema = z.object({
   label: nonEmpty,
@@ -78,8 +111,10 @@ export const LookupRuleSchema = z.object({
   /** Formula on the target row, e.g. ISBLANK([AdmissionNo]). */
   onlyWhen: z.string().optional(),
   pick: z.enum(['single', 'latestOnOrBefore', 'first']),
+  /** Only used by pick 'latestOnOrBefore'. Left out = take the first of the tied records. */
+  tieBreak: TieBreakSchema.optional(),
   notFoundValue: z.string(),
-  /** e.g. 'Attribution' -> Matched | Fallback | Unattributed */
+  /** e.g. 'Attribution' -> Matched | Fallback | Ambiguous | Unattributed */
   writeStatusColumn: z.string().optional(),
 });
 export type LookupRule = z.infer<typeof LookupRuleSchema>;
@@ -108,6 +143,20 @@ export const ReportDefSchema = z.object({
   columns: z.array(ReportColumnSchema),
   sort: z.array(z.object({ column: nonEmpty, dir: z.enum(['asc', 'desc']) })).optional(),
   totalsRow: z.boolean(),
+  /** Leave out rows where every aggregate column is 0 or blank. They are listed in the Checks. */
+  hideZeroRows: z.boolean().optional(),
+  /**
+   * A formula on the combined rows, applied BEFORE grouping: a row for which it is TRUE is not in the report at all
+   * (not in a row and not in the totals). The excluded rows are counted, with their amounts, in the Checks, and the
+   * tie-outs add them back (source total = report + excluded).
+   */
+  excludeRowsWhere: z.string().optional(),
+  /** What the excluded rows are, for the Checks line: "Excluded from report: <label> — …". */
+  excludeLabel: z.string().optional(),
+  /** Short names for the amounts of the excluded rows in the Checks, by report column: { "OP Pharmacy": "sales" }. */
+  excludeAmountLabels: z.record(z.string(), z.string()).optional(),
+  /** Splits the excluded rows in the Checks. A row goes to the first group whose formula is TRUE, else to "other". */
+  excludeGroups: z.array(z.object({ label: nonEmpty, where: nonEmpty })).optional(),
 });
 export type ReportDef = z.infer<typeof ReportDefSchema>;
 
@@ -139,6 +188,15 @@ export const TieOutSchema = z.object({
   column: nonEmpty,
   reportColumn: nonEmpty,
   tolerance: z.number().min(0),
+  /** More sources whose totals are added to `source` (for example OP Returns next to OP Pharmacy). */
+  alsoSources: z.array(nonEmpty).optional(),
+  /**
+   * Where the source total comes from: the 'footer' (grand-total row at the end of the file, the default) or 'rows'
+   * (the sum of the rows that were read and used, for files that have no total row).
+   */
+  totalFrom: z.enum(['footer', 'rows']).optional(),
+  /** How serious a mismatch is: 'warning' (the default) or 'error' (blocks the download). */
+  level: z.enum(['warning', 'error']).optional(),
 });
 export type TieOut = z.infer<typeof TieOutSchema>;
 

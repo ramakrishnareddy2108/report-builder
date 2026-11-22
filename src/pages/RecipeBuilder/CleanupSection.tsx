@@ -5,19 +5,21 @@ import { NativeSelect } from '@/components/NativeSelect';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import type { CleanupReport } from '@/engine/cleanup';
+import type { CleanupReport, CleanupStep } from '@/engine/cleanup';
 import { combinedColumns } from '@/recipe/columns';
 import type { CleanupRule } from '@/recipe/schema';
 import { useBuilder } from './builderStore';
 
 const NEW_RULE = (column: string): CleanupRule => ({
   column,
-  normalize: { trim: true, collapseSpaces: true, ignoreCase: true, removeChars: '.,' },
+  normalize: { trim: true, collapseSpaces: true, ignoreCase: true, removeChars: ',', dotsToSpace: true },
   displayCase: 'title',
   aliases: [],
 });
 
 type NameRow = { name: string; count: number; spellings: string[] };
+
+const STEP_LABEL: Record<CleanupStep, string> = { dots: 'dots became spaces', prefix: '“Dr” removed', suffix: 'ending removed' };
 
 /** One cleanup rule: options, a live list of the names it produces, and merging of names that are the same. */
 function RuleCard({ index, report, running }: { index: number; report: CleanupReport | undefined; running: boolean }) {
@@ -33,6 +35,7 @@ function RuleCard({ index, report, running }: { index: number; report: CleanupRe
   const [query, setQuery] = useState('');
   const [all, setAll] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [allAffected, setAllAffected] = useState(false);
 
   const names = useMemo<NameRow[]>(() => {
     const byName = new Map<string, NameRow>();
@@ -44,6 +47,9 @@ function RuleCard({ index, report, running }: { index: number; report: CleanupRe
     }
     return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [report]);
+
+  // the spellings that dots / “Dr” / the ending changed, most used first
+  const affected = useMemo(() => (report?.values ?? []).filter((v) => (v.steps?.length ?? 0) > 0).sort((a, b) => b.count - a.count || a.raw.localeCompare(b.raw)), [report]);
 
   if (!rule) return null;
   const patch = (fn: (r: CleanupRule) => void) => update((r) => void fn(r.cleanup[index] as CleanupRule));
@@ -98,7 +104,7 @@ function RuleCard({ index, report, running }: { index: number; report: CleanupRe
         </label>
         <label className="space-y-1 text-sm">
           <span className="font-medium">Remove these characters</span>
-          <Input value={rule.normalize.removeChars} onChange={(e) => patch((r) => (r.normalize.removeChars = e.target.value))} placeholder="e.g. .," aria-label="Characters to remove" />
+          <Input value={rule.normalize.removeChars} onChange={(e) => patch((r) => (r.normalize.removeChars = e.target.value))} placeholder="e.g. ," aria-label="Characters to remove" />
         </label>
         <label className="space-y-1 text-sm">
           <span className="font-medium">Show names in</span>
@@ -109,7 +115,42 @@ function RuleCard({ index, report, running }: { index: number; report: CleanupRe
           </NativeSelect>
         </label>
       </div>
-      <p className="text-xs text-muted-foreground">Extra spaces at the start, end and between words are always removed.</p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex min-h-10 items-center gap-3 text-sm">
+          <input type="checkbox" className="size-5 accent-primary" checked={rule.normalize.dotsToSpace ?? false} onChange={(e) => patch((r) => (r.normalize.dotsToSpace = e.target.checked))} />
+          <span>
+            Turn dots into spaces <span className="text-muted-foreground">(“K.KRISHNA” → “K KRISHNA”)</span>
+          </span>
+        </label>
+        <label className="flex min-h-10 items-center gap-3 text-sm">
+          <input type="checkbox" className="size-5 accent-primary" checked={rule.normalize.stripDrPrefix ?? false} onChange={(e) => patch((r) => (r.normalize.stripDrPrefix = e.target.checked))} />
+          <span>
+            Remove “Dr” at the start <span className="text-muted-foreground">(“Dr Rao” → “Rao”)</span>
+          </span>
+        </label>
+        <div className="space-y-1 sm:col-span-2">
+          <label className="flex min-h-10 items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="size-5 accent-primary"
+              checked={rule.normalize.stripSuffix?.enabled ?? false}
+              onChange={(e) => patch((r) => (r.normalize.stripSuffix = { enabled: e.target.checked, text: r.normalize.stripSuffix?.text || ' (REVIEW)' }))}
+            />
+            Remove this text from the end of the name
+          </label>
+          {rule.normalize.stripSuffix?.enabled && (
+            <Input
+              className="max-w-xs"
+              value={rule.normalize.stripSuffix.text}
+              onChange={(e) => patch((r) => (r.normalize.stripSuffix = { enabled: true, text: e.target.value }))}
+              placeholder="e.g. (REVIEW)"
+              aria-label="Text to remove from the end"
+            />
+          )}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">Extra spaces at the start, end and between words are always removed. Capital letters do not matter for “Dr” and the ending.</p>
 
       {rule.aliases.length > 0 && (
         <div className="space-y-2">
@@ -138,6 +179,34 @@ function RuleCard({ index, report, running }: { index: number; report: CleanupRe
           <p className="text-sm">
             <b>{report.rawNames}</b> spellings became <b>{report.cleanNames}</b> names.
           </p>
+
+          {(rule.normalize.dotsToSpace || rule.normalize.stripDrPrefix || rule.normalize.stripSuffix?.enabled) && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3" aria-label="Names changed by these options">
+              <h5 className="text-sm font-semibold">
+                {affected.length === 0 ? 'No name in your sample files is changed by these options.' : `${affected.length.toLocaleString('en-IN')} spelling${affected.length === 1 ? ' is' : 's are'} changed by these options`}
+              </h5>
+              {affected.length > 0 && (
+                <>
+                  <ul className="max-h-72 space-y-1 overflow-y-auto text-sm">
+                    {(allAffected ? affected : affected.slice(0, 8)).map((v) => (
+                      <li key={v.raw} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <span className="min-w-0 break-words">
+                          “{v.raw}” → <b>{v.clean}</b>
+                          <span className="ml-2 text-xs text-muted-foreground">{(v.steps ?? []).map((st) => STEP_LABEL[st]).join(', ')}</span>
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{v.count.toLocaleString('en-IN')} rows</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {!allAffected && affected.length > 8 && (
+                    <Button variant="outline" size="sm" onClick={() => setAllAffected(true)}>
+                      Show all {affected.length}
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {report.suspicious.length > 0 && (
             <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-50 p-3 dark:bg-amber-950/30">

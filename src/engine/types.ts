@@ -69,6 +69,13 @@ export type ReadSourceResult = {
   duplicates: { value: string; rows: number[] }[];
   /** Formula cells the export saved without a calculated value: they read as blank. */
   formulaCellsWithoutValue: number;
+  /**
+   * Per money / number column: the sum over the rows that were used (paise for money). It is the file's own total,
+   * counted before the combine, cleanup, lookups and report, so a tie-out can prove nothing was lost on the way.
+   */
+  totals: Record<string, number>;
+  /** Rows the row filter left out on purpose (the source's `leftOutNote`), with their amount in paise. Null when the source has no note. */
+  leftOut: { title: string; rows: number; amountPaise: number } | null;
   /** Blocking errors (a missing column, a bad formula). When there are any, `rows` is empty. */
   errors: Issue[];
 };

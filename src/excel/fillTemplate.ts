@@ -95,6 +95,63 @@ export async function openTemplateWorkbook(bytes: ArrayBuffer | Uint8Array): Pro
   return workbook;
 }
 
+/** Rule types ExcelJS can write back. Any other type is read but written as nothing, which leaves an invalid empty block. */
+const WRITABLE_RULES = new Set(['expression', 'cellIs', 'top10', 'aboveAverage', 'dataBar', 'colorScale', 'iconSet', 'containsText', 'timePeriod']);
+
+type LooseRule = { type?: string; style?: unknown; priority?: number };
+
+/** "Highlight duplicate values" as the equivalent expression rule, or null when the range is not one simple block. */
+function duplicateValuesAsExpression(ref: string): string | null {
+  const m = /^\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?$/.exec(ref.trim());
+  if (!m) return null;
+  const c1 = m[1] as string;
+  const r1 = m[2] as string;
+  const c2 = m[3] ?? c1;
+  const r2 = m[4] ?? r1;
+  return `AND(LEN(${c1}${r1})>0,COUNTIF($${c1}$${r1}:$${c2}$${r2},${c1}${r1})>1)`;
+}
+
+/**
+ * ExcelJS cannot write back everything it reads from a template, and what it writes wrong makes Excel say
+ * "We found a problem with some content … recover?". Two known cases, both handled here:
+ *  - a conditional-format rule ExcelJS cannot write (for example "highlight duplicate values") is written as nothing,
+ *    which leaves an EMPTY block, and that is invalid. "Duplicate values" is rewritten as the same rule in another
+ *    form (COUNTIF > 1, same colours); any other unsupported rule is removed;
+ *  - built-in names such as _FilterDatabase / Print_Area lose the sheet they belong to, which is also invalid.
+ * Returns plain-language notes about what was left out, so nothing disappears silently.
+ */
+export function makeExcelSafe(workbook: ExcelJS.Workbook): TemplateNote[] {
+  const notes: TemplateNote[] = [];
+  for (const sheet of workbook.worksheets) {
+    const blocks = (sheet as unknown as { conditionalFormattings?: ExcelJS.ConditionalFormattingOptions[] }).conditionalFormattings ?? [];
+    const lost: string[] = [];
+    for (const block of blocks) {
+      const kept: ExcelJS.ConditionalFormattingOptions['rules'] = [];
+      for (const rule of block.rules ?? []) {
+        const loose = rule as unknown as LooseRule;
+        if (loose.type && WRITABLE_RULES.has(loose.type)) {
+          kept.push(rule);
+          continue;
+        }
+        const formula = loose.type === 'duplicateValues' ? duplicateValuesAsExpression(block.ref) : null;
+        if (formula) kept.push({ type: 'expression', formulae: [formula], style: loose.style, priority: loose.priority } as unknown as (typeof kept)[number]);
+        else lost.push(block.ref);
+      }
+      block.rules = kept;
+    }
+    sheet.removeConditionalFormatting((b: ExcelJS.ConditionalFormattingOptions) => b.rules.length > 0);
+    if (lost.length > 0) {
+      notes.push({
+        level: 'info',
+        message: `Sheet “${sheet.name}”: conditional formatting on ${[...new Set(lost)].join(', ')} was not kept. The library that writes Excel files cannot copy that kind of rule, and keeping it would make Excel report a damaged file. Add it again in Excel if you need it.`,
+      });
+    }
+  }
+  const names = workbook.definedNames.model;
+  if (names.some((n) => n.name.startsWith('_xlnm.'))) workbook.definedNames.model = names.filter((n) => !n.name.startsWith('_xlnm.'));
+  return notes;
+}
+
 /** Shift the relative row numbers of A1 references: "F5+G5" by 2 → "F7+G7". `$F$5` keeps its row. */
 export function shiftFormulaRows(formula: string, delta: number): string {
   return formula.replace(/(^|[^A-Za-z0-9_.])(\$?[A-Z]{1,3})(\$?)(\d+)(?![\d(A-Za-z_])/g, (match, pre: string, col: string, abs: string, row: string) =>

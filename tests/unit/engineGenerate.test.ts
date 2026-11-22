@@ -52,10 +52,10 @@ describe('end to end: synthetic month', () => {
   it('attributes pharmacy rows: matched, nearest later record, not found', async () => {
     const r = await generate(input(recipe()));
     const pharmacy = r.lookups.find((l) => l.label === 'Pharmacy attribution');
-    expect(pharmacy?.byStatus).toEqual({ Matched: 2, Fallback: 1, Unattributed: 1 });
-    expect(pharmacy?.amountByStatus).toEqual({ Matched: 30010, Fallback: 5000, Unattributed: 7020 });
+    expect(pharmacy?.byStatus).toEqual({ Matched: 2, Fallback: 1, Ambiguous: 0, Unattributed: 1 });
+    expect(pharmacy?.amountByStatus).toEqual({ Matched: 30010, Fallback: 5000, Ambiguous: 0, Unattributed: 7020 });
     expect(pharmacy?.notFoundKeys).toEqual(['UMR9']);
-    expect(r.lookups.find((l) => l.label === 'Returns attribution')?.byStatus).toEqual({ Matched: 1, Fallback: 0, Unattributed: 0 });
+    expect(r.lookups.find((l) => l.label === 'Returns attribution')?.byStatus).toEqual({ Matched: 1, Fallback: 0, Ambiguous: 0, Unattributed: 0 });
     const status = r.combined.rows.filter((x) => x.Source === 'OP Pharmacy').map((x) => [x.Ref, x.Doctor, x.Attribution]);
     expect(status).toEqual([
       ['P1', 'Dr A Kumar', 'Matched'],
@@ -83,13 +83,14 @@ describe('end to end: synthetic month', () => {
     expect(levels).toMatch(/^(warning,)+(info,)*info$/);
   });
 
-  it('a tie-out that does not match is a warning with both totals', async () => {
+  it('a tie-out that does not match is a warning with both totals (the report side is what that source added to the column)', async () => {
     const r2 = recipe();
     r2.checks.tieOuts = [{ label: 'Pharmacy vs billing', source: 'opBilling', column: 'Amount', reportColumn: 'OP Pharmacy', tolerance: 0.01 }];
     const r = await generate(input(r2));
     const c = r.checks.find((x) => x.title === 'Tie-out: Pharmacy vs billing');
     expect(c?.level).toBe('warning');
-    expect(c?.message).toMatch(/₹3,500\.15.*₹410\.20/);
+    // OP Billing adds nothing to the OP Pharmacy column, so the report side of this comparison is ₹0.00
+    expect(c?.message).toMatch(/₹3,500\.15.*₹0\.00/);
   });
 
   it('writes a plain workbook with Checks and Combined sheets, money in rupees', async () => {

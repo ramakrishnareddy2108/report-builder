@@ -4,7 +4,7 @@
 import { WorkbookReadError } from '@/excel/readWorkbook';
 import type { TaskProgress, WorkerRequest, WorkerResponse } from './protocol';
 import { combineTask } from './tasks/combine';
-import { exportCombinedTask, generateTask } from './tasks/generate';
+import { exportCombinedTask, exportIntermediateTask, generateTask } from './tasks/generate';
 import { exportTableTask, readOutputsTask } from './tasks/dashboardTasks';
 import { inspectTemplateTask } from './tasks/inspectTemplate';
 import { previewTask } from './tasks/preview';
@@ -44,6 +44,8 @@ scope.addEventListener('message', (e) => {
         return generateTask(req.payload, progress);
       case 'exportCombined':
         return exportCombinedTask();
+      case 'exportIntermediate':
+        return exportIntermediateTask(req.payload);
     }
   };
 

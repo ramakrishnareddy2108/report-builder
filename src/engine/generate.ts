@@ -77,7 +77,9 @@ export function prepareData(input: GenerateInput, onProgress: GenerateProgress =
       issues.push(
         source.required
           ? { level: 'error', sourceId: source.id, message: `${source.label}: no file was added for this source. Add the file, or mark the source as optional in the recipe.` }
-          : { level: 'info', sourceId: source.id, message: `${source.label}: optional source, no file added. It is left out.` },
+          : source.missingWarning
+            ? { level: 'warning', sourceId: source.id, message: source.missingWarning }
+            : { level: 'info', sourceId: source.id, message: `${source.label}: optional source, no file added. It is left out.` },
       );
       continue;
     }

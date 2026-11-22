@@ -4,6 +4,12 @@
 //  - Each aggregate column's `where` formula is evaluated once per combined row.
 //  - Money is summed as integer paise. Formula columns see rupees and their money results go back to paise.
 //  - Formula columns work on the same report row, in dependency order (a formula may use another formula column).
+//  - Option hideZeroRows: a row whose aggregate columns are all 0 (or blank) is left out of `rows` and listed in
+//    `hidden`, so the Checks can show it. The totals still count every combined row.
+//  - Option excludeRowsWhere: a formula on the combined rows, applied BEFORE grouping. A row it is TRUE for is not in the
+//    report (no row, no total). It is counted, with its amounts, in `excluded` so the Checks show it and the tie-outs add it back.
+//  - `sourceShares` / `excludedShares`: for every aggregate column, how much each source (the Source column) contributed to
+//    the report, and to the excluded rows. A tie-out compares a source's own total with its share.
 //  - The totals row is built from ALL rows with the same aggregates (so SUM, COUNT, COUNTDISTINCT, AVG, MIN and MAX
 //    are all right), and its formula columns are recomputed on the totals.
 
@@ -13,16 +19,47 @@ import { compileFormula, describeFormulaError, FormulaError, toBool, type Compil
 import type { CellValue } from '@/excel/readWorkbook';
 import type { ColumnType, ReportColumn, ReportDef } from '@/recipe/schema';
 import { makeRowContext } from './rowContext';
-import type { CombinedRow, CombinedTable, Issue, Typed } from './types';
+import { SOURCE_COLUMN, type CombinedRow, type CombinedTable, type Issue, type Typed } from './types';
 
 export type ReportColumnInfo = { name: string; type: ColumnType; kind: ReportColumn['kind'] };
 export type ReportRow = Record<string, Typed>;
+
+/** A report row that was left out because every aggregate column was 0. */
+export type HiddenRow = {
+  /** The group-by values, e.g. "Dr A · Cardiology · Oct-2026". */
+  label: string;
+  /** Combined rows in the group (they are all counted in the totals). */
+  combinedRows: number;
+};
+
+/** Aggregate column (upper case) -> source label (upper case) -> value. */
+export type SourceShares = Record<string, Record<string, Typed>>;
+
+/** Combined rows that `excludeRowsWhere` kept out of the report, with what they hold in every aggregate column. */
+export type ExcludedRows = {
+  label: string | null;
+  /** Short names for the amounts in the Checks, by report column (for example "OP Pharmacy" -> "sales"). */
+  amountLabels: Record<string, string>;
+  rows: number;
+  /** Aggregate column name -> value over the excluded rows (only the columns that are not 0). */
+  amounts: Record<string, number>;
+  /** The excluded rows split by the recipe's `excludeGroups` (first formula that is TRUE; the rest are "other"). */
+  groups: { label: string; rows: number; amounts: Record<string, number> }[];
+};
 
 export type ReportResult = {
   columns: ReportColumnInfo[];
   rows: ReportRow[];
   /** The totals row, or null when the report has none. */
   totals: ReportRow | null;
+  /** Rows left out by "Hide rows where all aggregate columns are 0" (empty when the option is off). */
+  hidden: HiddenRow[];
+  /** Rows left out by `excludeRowsWhere`, or null when the option is off or no row matched. */
+  excluded: ExcludedRows | null;
+  /** Aggregate column (upper case) -> source label (upper case) -> what that source added to the report. Same unit as the report cells. */
+  sourceShares: SourceShares;
+  /** The same for the excluded rows, so that  source total = report share + excluded share. */
+  excludedShares: SourceShares;
   issues: Issue[];
   /** Combined rows counted into the report (all of them: nothing is dropped between combined and report). */
   inputRows: number;
@@ -82,7 +119,7 @@ function finish(agg: AggColumn, acc: Acc, sourceType: ColumnType | null): Typed 
 export function buildReport(table: CombinedTable, def: ReportDef, params: FormulaParams = {}): ReportResult {
   const issues: Issue[] = [];
   const fail = (message: string, column?: string) => issues.push({ level: 'error', message: `Report: ${message}`, ...(column ? { column } : {}) });
-  const empty = (): ReportResult => ({ columns: [], rows: [], totals: null, issues, inputRows: table.rows.length });
+  const empty = (): ReportResult => ({ columns: [], rows: [], totals: null, hidden: [], excluded: null, sourceShares: {}, excludedShares: {}, issues, inputRows: table.rows.length });
 
   const tableCol = (name: string) => table.columns.find((c) => same(c.name, name)) ?? null;
   const columns: ReportColumnInfo[] = def.columns.map((c) => ({ name: c.name, type: c.kind === 'serial' ? 'number' : c.kind === 'group' ? (tableCol(c.from)?.type ?? 'text') : c.type, kind: c.kind }));
@@ -145,6 +182,19 @@ export function buildReport(table: CombinedTable, def: ReportDef, params: Formul
       }
     }
   }
+  const compileOnRows = (text: string, what: string): CompiledFormula | null => {
+    try {
+      const f = compileFormula(text);
+      const unknown = f.columns.filter((n) => !tableCol(n));
+      for (const n of unknown) fail(`${what} uses [${n}], but column ${n} was not found in the combined data.`, n);
+      return unknown.length === 0 ? f : null;
+    } catch (err) {
+      fail(`${what} is not a valid formula: ${describeFormulaError(err)}`);
+      return null;
+    }
+  };
+  const excludeCompiled = def.excludeRowsWhere?.trim() ? compileOnRows(def.excludeRowsWhere, 'the “leave out rows where” formula') : null;
+  const excludeGroups = (def.excludeGroups ?? []).map((g) => ({ label: g.label, compiled: compileOnRows(g.where, `the excluded-rows group “${g.label}”`) }));
   for (const s of def.sort ?? []) if (!def.columns.some((c) => same(c.name, s.column))) fail(`sorting by “${s.column}”, which is not a column of the report.`, s.column);
 
   // formula order: a formula comes after the formula columns it uses
@@ -163,11 +213,30 @@ export function buildReport(table: CombinedTable, def: ReportDef, params: Formul
   // --- one pass over the combined rows ---------------------------------------------------------
   const whereCtx = makeRowContext(table.columns, params);
   const whereErrors = new Map<number, { count: number; message: string }>();
-  type Group = { gvals: Typed[]; accs: Acc[]; row: number };
+  type Group = { gvals: Typed[]; accs: Acc[]; row: number; combined: number };
   const groups = new Map<string, Group>();
   const total: Acc[] = aggs.map((a) => newAcc(a.col.agg === 'COUNTDISTINCT'));
   const groupCols = def.groupBy.map((g) => tableCol(g)?.name as string);
   const passes = new Array<boolean>(whereCompiled.length);
+  // what each source adds to each aggregate column (included rows), and the same for the excluded rows
+  const shareAccs: Map<string, Acc>[] = aggs.map(() => new Map());
+  const excl = {
+    rows: 0,
+    errors: 0,
+    errorMessage: '',
+    total: aggs.map((a) => newAcc(a.col.agg === 'COUNTDISTINCT')),
+    bySource: aggs.map((): Map<string, Acc> => new Map()),
+    groups: excludeGroups.map((g) => ({ label: g.label, rows: 0, accs: aggs.map((a) => newAcc(a.col.agg === 'COUNTDISTINCT')) })),
+    other: { label: 'other', rows: 0, accs: aggs.map((a) => newAcc(a.col.agg === 'COUNTDISTINCT')) },
+  };
+  const accFor = (map: Map<string, Acc>, key: string, a: (typeof aggs)[number]): Acc => {
+    let acc = map.get(key);
+    if (!acc) {
+      acc = newAcc(a.col.agg === 'COUNTDISTINCT');
+      map.set(key, acc);
+    }
+    return acc;
+  };
 
   const add = (acc: Acc, a: (typeof aggs)[number], row: CombinedRow) => {
     acc.rows++;
@@ -197,19 +266,61 @@ export function buildReport(table: CombinedTable, def: ReportDef, params: Formul
         whereErrors.set(w, e);
       }
     }
+    // rows the recipe leaves out of the report: counted here, never grouped
+    if (excludeCompiled) {
+      let out = false;
+      try {
+        out = toBool(excludeCompiled.evaluate(whereCtx(row)));
+      } catch (err) {
+        excl.errors++;
+        excl.errorMessage = describeFormulaError(err);
+      }
+      if (out) {
+        excl.rows++;
+        let target = excl.other;
+        for (let k = 0; k < excludeGroups.length; k++) {
+          const f = (excludeGroups[k] as (typeof excludeGroups)[number]).compiled;
+          if (!f) continue;
+          let hit = false;
+          try {
+            hit = toBool(f.evaluate(whereCtx(row)));
+          } catch {
+            hit = false;
+          }
+          if (hit) {
+            target = excl.groups[k] as typeof excl.other;
+            break;
+          }
+        }
+        target.rows++;
+        const source = String(row[SOURCE_COLUMN] ?? '').toUpperCase();
+        aggs.forEach((a, j) => {
+          if (a.whereIndex !== -1 && !passes[a.whereIndex]) return;
+          add(excl.total[j] as Acc, a, row);
+          add(target.accs[j] as Acc, a, row);
+          add(accFor(excl.bySource[j] as Map<string, Acc>, source, a), a, row);
+        });
+        return;
+      }
+    }
     const gvals = groupCols.map((g) => row[g] ?? null);
     const key = gvals.map((v) => (v === null ? '' : String(v))).join('\u0001');
     let g = groups.get(key);
     if (!g) {
-      g = { gvals, accs: aggs.map((a) => newAcc(a.col.agg === 'COUNTDISTINCT')), row: r };
+      g = { gvals, accs: aggs.map((a) => newAcc(a.col.agg === 'COUNTDISTINCT')), row: r, combined: 0 };
       groups.set(key, g);
     }
+    g.combined++;
     aggs.forEach((a, j) => {
       if (a.whereIndex !== -1 && !passes[a.whereIndex]) return;
       add(g.accs[j] as Acc, a, row);
       add(total[j] as Acc, a, row);
+      add(accFor(shareAccs[j] as Map<string, Acc>, String(row[SOURCE_COLUMN] ?? '').toUpperCase(), a), a, row);
     });
   });
+  if (excl.errors > 0) {
+    issues.push({ level: 'warning', message: `Report: the “leave out rows where” formula could not be evaluated on ${excl.errors} row${excl.errors === 1 ? '' : 's'} (${excl.errorMessage}). Those rows are kept in the report.` });
+  }
   for (const [w, e] of whereErrors) {
     const names = aggs.filter((a) => a.whereIndex === w).map((a) => `“${a.col.name}”`).join(', ');
     issues.push({ level: 'warning', message: `Report: the filter of ${names} could not be evaluated on ${e.count} row${e.count === 1 ? '' : 's'} (${e.message}). Those rows are not counted in ${names}.` });
@@ -246,7 +357,7 @@ export function buildReport(table: CombinedTable, def: ReportDef, params: Formul
       } else row[c.name] = null; // serial and formula columns are filled below
     }
     runFormulas(row);
-    return { row, gvals: g.gvals, first: g.row };
+    return { row, gvals: g.gvals, first: g.row, combined: g.combined };
   });
 
   // --- sort, then number the rows ------------------------------------------------------------
@@ -270,7 +381,19 @@ export function buildReport(table: CombinedTable, def: ReportDef, params: Formul
       return a.first - b.first;
     });
   }
-  const rows = built.map((b) => b.row);
+  // hide the rows where every aggregate column is 0 (a report with no aggregate column is never emptied)
+  const hidden: HiddenRow[] = [];
+  let shown = built;
+  const aggNames = def.columns.filter((c) => c.kind === 'aggregate').map((c) => c.name);
+  if (def.hideZeroRows && aggNames.length > 0) {
+    shown = [];
+    for (const b of built) {
+      if (aggNames.every((n) => b.row[n] === null || b.row[n] === 0)) {
+        hidden.push({ label: b.gvals.map((v) => (v === null || v === '' ? '(blank)' : String(v))).join(' · ') || '(all rows)', combinedRows: b.combined });
+      } else shown.push(b);
+    }
+  }
+  const rows = shown.map((b) => b.row);
   const serials = def.columns.filter((c) => c.kind === 'serial');
   rows.forEach((row, i) => {
     for (const s of serials) row[s.name] = i + 1;
@@ -304,5 +427,34 @@ export function buildReport(table: CombinedTable, def: ReportDef, params: Formul
     });
   }
 
-  return { columns, rows, totals, issues, inputRows: table.rows.length };
+  // --- shares and excluded rows ------------------------------------------------------------------
+  const sharesOf = (maps: Map<string, Acc>[]): SourceShares => {
+    const out: SourceShares = {};
+    aggs.forEach((a, j) => {
+      const bySource: Record<string, Typed> = {};
+      for (const [source, acc] of maps[j] as Map<string, Acc>) bySource[source] = finish(a.col, acc, a.sourceType);
+      out[a.col.name.toUpperCase()] = bySource;
+    });
+    return out;
+  };
+  const amountsOf = (accs: Acc[]): Record<string, number> => {
+    const out: Record<string, number> = {};
+    aggs.forEach((a, j) => {
+      const v = finish(a.col, accs[j] as Acc, a.sourceType);
+      if (typeof v === 'number' && v !== 0) out[a.col.name] = v;
+    });
+    return out;
+  };
+  const excluded: ExcludedRows | null =
+    excl.rows === 0
+      ? null
+      : {
+          label: def.excludeLabel?.trim() || null,
+          amountLabels: def.excludeAmountLabels ?? {},
+          rows: excl.rows,
+          amounts: amountsOf(excl.total),
+          groups: [...excl.groups, excl.other].filter((g) => g.rows > 0).map((g) => ({ label: g.label, rows: g.rows, amounts: amountsOf(g.accs) })),
+        };
+
+  return { columns, rows, totals, hidden, excluded, sourceShares: sharesOf(shareAccs), excludedShares: sharesOf(excl.bySource), issues, inputRows: table.rows.length };
 }

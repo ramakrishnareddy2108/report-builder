@@ -1,7 +1,13 @@
 // Pipeline step 6: clean up names (doctors, departments, sponsors ...) so spelling variants group together.
 //
-// For each rule, every value of the column is normalised into a KEY (trim, collapse spaces, remove the listed
-// characters, and ignore case when asked). Values with the same key become one name. An explicit alias
+// For each rule, every value of the column is normalised into a KEY. The steps, in order:
+//   1. dots → spaces (option)           "K.KRISHNA CHAND"           → "K KRISHNA CHAND"
+//   2. remove the listed characters
+//   3. collapse spaces, trim
+//   4. strip a trailing text (option)    "SRIMANNARAYANA (REVIEW)"   → "SRIMANNARAYANA"
+//   5. strip a leading "DR " (option)    "DR SRIMANNARAYANA"         → "SRIMANNARAYANA"
+// and the key ignores case when asked. A strip never leaves an empty name: if nothing would be left, the text is
+// kept as it was. Values with the same key become one name. An explicit alias
 // ("treat as same") maps several spellings onto one name. The name that is written back is, in order:
 // the alias target, else the most common spelling in the data, shown in the rule's display case.
 //
@@ -11,7 +17,10 @@
 import type { CleanupRule } from '@/recipe/schema';
 import type { CombinedTable, Issue } from './types';
 
-export type CleanupMapping = { raw: string; clean: string; count: number };
+/** Which optional step changed a value (for the preview of affected values). */
+export type CleanupStep = 'dots' | 'prefix' | 'suffix';
+
+export type CleanupMapping = { raw: string; clean: string; count: number; /** Optional steps that changed this spelling. */ steps?: CleanupStep[] };
 
 export type CleanupReport = {
   column: string;
@@ -35,18 +44,51 @@ export type SuspiciousPair = { a: string; b: string; reason: string };
 
 export type CleanupResult = { reports: CleanupReport[]; issues: Issue[] };
 
-function normaliseKey(raw: string, rule: CleanupRule): string {
-  let s = raw;
-  for (const ch of rule.normalize.removeChars) s = s.split(ch).join('');
-  s = s.replace(/\s+/g, ' ').trim();
-  return rule.normalize.ignoreCase ? s.toLowerCase() : s;
+const collapse = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+/** The text after the rule's steps (case kept) and the optional steps that changed it. */
+export function cleanText(raw: string, rule: Pick<CleanupRule, 'normalize'>): { text: string; steps: CleanupStep[] } {
+  const n = rule.normalize;
+  const steps: CleanupStep[] = [];
+  const base = (input: string): string => {
+    let t = input;
+    if (n.dotsToSpace) t = t.split('.').join(' ');
+    for (const ch of n.removeChars) t = t.split(ch).join('');
+    return collapse(t);
+  };
+
+  let s = base(raw);
+  if (n.dotsToSpace && raw.includes('.')) steps.push('dots');
+
+  const suffix = n.stripSuffix;
+  if (suffix?.enabled) {
+    const tail = base(suffix.text).toLowerCase();
+    if (tail !== '' && s.toLowerCase().endsWith(tail)) {
+      const rest = collapse(s.slice(0, s.length - tail.length));
+      if (rest !== '') {
+        s = rest;
+        steps.push('suffix');
+      }
+    }
+  }
+  if (n.stripDrPrefix) {
+    const m = /^dr\s+(.+)$/i.exec(s);
+    if (m) {
+      s = collapse(m[1] as string);
+      steps.push('prefix');
+    }
+  }
+  return { text: s, steps };
 }
 
-/** The text with the rule's removed characters taken out and spaces collapsed, keeping the original case. */
+function normaliseKey(raw: string, rule: CleanupRule): string {
+  const { text } = cleanText(raw, rule);
+  return rule.normalize.ignoreCase ? text.toLowerCase() : text;
+}
+
+/** The text with the rule's steps applied, keeping the original case. */
 function tidy(raw: string, rule: CleanupRule): string {
-  let s = raw;
-  for (const ch of rule.normalize.removeChars) s = s.split(ch).join('');
-  return s.replace(/\s+/g, ' ').trim();
+  return cleanText(raw, rule).text;
 }
 
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|[^\p{L}\p{N}])(\p{L})/gu, (_, sep: string, c: string) => sep + c.toUpperCase());
@@ -162,9 +204,13 @@ export function cleanup(table: CombinedTable, rules: readonly CleanupRule[]): Cl
       if (t !== undefined) key = normaliseKey(t, rule);
       const clean = cleanOf.get(key) as string;
       row[column] = clean;
-      const all = valueCount.get(raw) ?? { raw, clean, count: 0 };
+      let all = valueCount.get(raw);
+      if (!all) {
+        const steps = cleanText(raw, rule).steps;
+        all = { raw, clean, count: 0, ...(steps.length > 0 ? { steps } : {}) };
+        valueCount.set(raw, all);
+      }
       all.count++;
-      valueCount.set(raw, all);
       if (clean !== raw) {
         const m = mappingCount.get(raw) ?? { raw, clean, count: 0 };
         m.count++;

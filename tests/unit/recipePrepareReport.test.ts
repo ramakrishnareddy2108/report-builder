@@ -84,7 +84,7 @@ describe('preview task (the live preview of the Prepare and Report tabs)', () =>
     const doctors = r.cleanup.find((c) => c.column === 'Doctor');
     expect(doctors).toMatchObject({ rawNames: 5, cleanNames: 2 });
     expect(doctors?.values.map((v) => v.clean)).toContain('Dr A Kumar');
-    expect(r.lookups.find((l) => l.label === 'Pharmacy attribution')?.byStatus).toEqual({ Matched: 2, Fallback: 1, Unattributed: 1 });
+    expect(r.lookups.find((l) => l.label === 'Pharmacy attribution')?.byStatus).toEqual({ Matched: 2, Fallback: 1, Ambiguous: 0, Unattributed: 1 });
     expect(r.columns.map((c) => c.name)).toContain('Attribution');
     expect(r.combinedRows).toBe(14);
   });

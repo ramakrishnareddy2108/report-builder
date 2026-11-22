@@ -94,6 +94,8 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
     footerRows: [],
     duplicates: [],
     formulaCellsWithoutValue: 0,
+    totals: {},
+    leftOut: null,
     errors: [],
   };
   const fail = (...issues: Issue[]): ReadSourceResult => ({ ...result, rows: [], footerRows: [], errors: [...result.errors, ...issues] });
@@ -161,6 +163,13 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
   }
   result.columns = columns;
 
+  let noteColumn: string | null = null; // the column whose amount is added up for the rows the filter leaves out
+  if (def.leftOutNote?.amountColumn) {
+    const wanted = def.leftOutNote.amountColumn.toUpperCase();
+    noteColumn = columns.find((c) => c.name.toUpperCase() === wanted)?.name ?? null;
+    if (noteColumn === null) errors.push(error(`${def.label}: the note for left-out rows uses column ${def.leftOutNote.amountColumn}, which is not one of this source's columns. Fix it in Sources.`, def.leftOutNote.amountColumn));
+  }
+
   let uniqueName: string | null = null;
   if (def.uniqueColumn) {
     const wanted = def.uniqueColumn.toUpperCase();
@@ -175,7 +184,8 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
   const money = new Set(columns.filter((c) => c.type === 'money').map((c) => c.name.toUpperCase()));
   const typedNames = new Map(columns.map((c) => [c.name.toUpperCase(), c.name] as const));
 
-  const noteUnreadable = (row: number, column: string, raw: string | null, reason: UnreadableValue['reason'], message?: string) => {
+  const noteUnreadable = (row: number, column: string, raw: string | null, reason: UnreadableValue['reason'], message?: string, count = true) => {
+    if (!count) return;
     stats.unreadableByColumn[column] = (stats.unreadableByColumn[column] ?? 0) + 1;
     if (result.unreadable.length < MAX_LISTED) result.unreadable.push({ row, column, raw, reason, ...(message ? { message } : {}) });
   };
@@ -189,8 +199,37 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
     }
   };
 
+  /** Adds the calculated columns to `values`. `count` is false for rows that are only valued for the left-out note. */
+  const addCalculated = (raw: Row, excelRow: number, values: Record<string, Typed>, count: boolean) => {
+    for (const calc of calcs) {
+      if (!calc.formula) continue; // unreachable: a bad formula is a blocking error above
+      let out: Typed = null;
+      try {
+        const ctx = {
+          getColumn: (name: string): Value | undefined => {
+            const typedKey = typedNames.get(name.toUpperCase());
+            if (typedKey !== undefined) {
+              const v = values[typedKey] ?? null;
+              return money.has(typedKey.toUpperCase()) && typeof v === 'number' ? v / 100 : v;
+            }
+            const i = cols.find(name);
+            return i === null ? undefined : (raw[i] ?? null);
+          },
+          getParam: (name: string) => params[name] ?? Object.entries(params).find(([k]) => k.toUpperCase() === name.toUpperCase())?.[1],
+        };
+        const cv = convertValue(calc.formula.evaluate(ctx) as CellValue, calc.type);
+        out = cv.value;
+        if (cv.status === 'unreadable') noteUnreadable(excelRow, calc.as, cv.raw, 'unreadable', undefined, count);
+      } catch (err) {
+        noteUnreadable(excelRow, calc.as, null, 'formulaError', describeFormulaError(err), count);
+      }
+      values[calc.as] = out;
+    }
+  };
+
   const trailing: { row: number; raw: Row }[] = [];
   const kept: SourceRow[] = [];
+  const leftOut = def.leftOutNote ? { title: def.leftOutNote.title, rows: 0, amountPaise: 0 } : null;
 
   for (let r = headerRow; r < sheet.rows.length; r++) {
     const raw = sheet.rows[r] as Row;
@@ -216,6 +255,17 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
     }
     if (!keep) {
       stats.filtered++;
+      if (leftOut) {
+        // counted, with its amount, for the Checks
+        leftOut.rows++;
+        if (noteColumn !== null) {
+          const v: Record<string, Typed> = {};
+          convertDeclared(raw, excelRow, v, false);
+          addCalculated(raw, excelRow, v, false);
+          const n = v[noteColumn];
+          if (typeof n === 'number') leftOut.amountPaise += n;
+        }
+      }
       trailing.push({ row: excelRow, raw });
       if (trailing.length > MAX_FOOTER) trailing.shift();
       continue;
@@ -224,36 +274,23 @@ export function readSource(file: SourceFile, def: SourceDef, params: FormulaPara
 
     const values: Record<string, Typed> = {};
     convertDeclared(raw, excelRow, values, true);
-
-    for (const calc of calcs) {
-      if (!calc.formula) continue; // unreachable: a bad formula is a blocking error above
-      let out: Typed = null;
-      try {
-        const ctx = {
-          getColumn: (name: string): Value | undefined => {
-            const typedKey = typedNames.get(name.toUpperCase());
-            if (typedKey !== undefined) {
-              const v = values[typedKey] ?? null;
-              return money.has(typedKey.toUpperCase()) && typeof v === 'number' ? v / 100 : v;
-            }
-            const i = cols.find(name);
-            return i === null ? undefined : (raw[i] ?? null);
-          },
-          getParam: (name: string) => params[name] ?? Object.entries(params).find(([k]) => k.toUpperCase() === name.toUpperCase())?.[1],
-        };
-        const cv = convertValue(calc.formula.evaluate(ctx) as CellValue, calc.type);
-        out = cv.value;
-        if (cv.status === 'unreadable') noteUnreadable(excelRow, calc.as, cv.raw, 'unreadable');
-      } catch (err) {
-        noteUnreadable(excelRow, calc.as, null, 'formulaError', describeFormulaError(err));
-      }
-      values[calc.as] = out;
-    }
+    addCalculated(raw, excelRow, values, true);
     kept.push({ row: excelRow, values });
   }
 
   stats.used = kept.length;
   result.rows = kept;
+  result.leftOut = leftOut;
+  // the file's own total of every money / number column (integer paise for money, so the sum is exact)
+  for (const c of columns) {
+    if (c.type !== 'money' && c.type !== 'number') continue;
+    let sum = 0;
+    for (const row of kept) {
+      const v = row.values[c.name];
+      if (typeof v === 'number') sum += v;
+    }
+    result.totals[c.name] = c.type === 'money' ? sum : Number(sum.toPrecision(15));
+  }
 
   // Rows left out at the very end are normally the export's grand-total row. Keep their values for the tie-out.
   for (const t of trailing) {

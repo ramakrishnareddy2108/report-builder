@@ -1,12 +1,13 @@
-import { Download, LayoutDashboard, Layers } from 'lucide-react';
+import { Download, LayoutDashboard, Layers, Table2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLibrary } from '@/app/libraryStore';
 import { useAppStore } from '@/app/store';
 import { ChecksPanel } from '@/components/ChecksPanel';
 import { ReportGrid } from '@/components/ReportGrid';
 import { Button } from '@/components/ui/button';
 import type { Check } from '@/engine/checks';
 import { downloadFile, XLSX_MIME } from '@/lib/download';
-import { exportCombinedInWorker } from '@/worker/client';
+import { exportCombinedInWorker, exportIntermediateInWorker } from '@/worker/client';
 import type { GenerateTaskResult } from '@/worker/tasks/generate';
 import { reportFileName } from './assignments';
 
@@ -19,6 +20,7 @@ type Props = {
 /** What comes after Generate: the checks, the report, and the downloads. */
 export function ResultView({ result, info, onFix }: Props) {
   const go = useAppStore((s) => s.go);
+  const recipe = useLibrary((s) => s.recipes.find((r) => r.id === info.recipeId));
   const errors = result.checks.filter((c) => c.level === 'error').length;
   const fileName = reportFileName(info.recipeName, info.period);
 
@@ -26,6 +28,16 @@ export function ResultView({ result, info, onFix }: Props) {
     try {
       const bytes = await exportCombinedInWorker();
       downloadFile(fileName.replace(/\.xlsx$/, '_combined-data.xlsx'), bytes as unknown as BlobPart, XLSX_MIME);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not make the file.');
+    }
+  }
+
+  async function intermediate() {
+    if (!recipe) return;
+    try {
+      const bytes = await exportIntermediateInWorker({ recipe: { sources: recipe.sources, lookups: recipe.lookups }, sources: result.sources });
+      downloadFile(fileName.replace(/\.xlsx$/, '_intermediate.xlsx'), bytes as unknown as BlobPart, XLSX_MIME);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not make the file.');
     }
@@ -46,6 +58,9 @@ export function ResultView({ result, info, onFix }: Props) {
           >
             <Download className="size-5" /> Download report
           </Button>
+          <Button size="lg" variant="outline" disabled={!recipe || result.sources.length === 0} onClick={() => void intermediate()}>
+            <Table2 className="size-5" /> Download intermediate Excel
+          </Button>
           <Button size="lg" variant="outline" disabled={!result.report} onClick={() => void combined()}>
             <Layers className="size-5" /> Download combined data
           </Button>
@@ -54,6 +69,7 @@ export function ResultView({ result, info, onFix }: Props) {
           </Button>
         </div>
         {result.canDownload && <p className="text-sm text-muted-foreground">File name: {fileName}</p>}
+        <p className="text-sm text-muted-foreground">The intermediate Excel has one sheet per file with only the columns you selected, and works even when the report is blocked.</p>
         {!result.canDownload && errors > 0 && <p className="text-sm text-destructive">Fix the {errors} problem{errors === 1 ? '' : 's'} below and generate again. The download is switched off until then.</p>}
       </div>
 

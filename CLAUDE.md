@@ -158,7 +158,61 @@ Sponsor-wise template (`Sponsor-wise Revenue Report.xlsx`): header row 4, column
   - `Total Revenue = E+F+G`
   - `Gross Profit = H-I-K`
 
-## Default measure rules (proposed — must be confirmed against a filled October DRR)
+## Default DRR recipe (the rules finance confirmed, October 2026)
+
+This is the source of truth for the starter recipes in `src/recipe/defaults/` (`drr.recipe.json`, `sponsorwise.recipe.json`).
+The app is recipe-based (`src/recipe`, `src/engine`). The sections above and below that describe the workspace folder,
+fact rows, `rules.json`, measures and run folders belong to the older design and are kept for the file facts only. Where they
+disagree with this section, this section wins. Rules are data in the recipe, never hard-coded in the engine.
+
+**Sources.** The 7 files of the table above are used (IP Admissions is not used and is listed in Checks as *Files not used*).
+`costs` is an optional 8th source (columns Doctor, Departmental Issues Cost, Salary Cost, Incentives, Professional Fee).
+
+**Cleanup (Doctor).** Dots become spaces, then spaces collapse; a leading "DR " and a trailing " (REVIEW)" are stripped; title
+case. `K.KRISHNA CHAND` → `K Krishna Chand`, `G.AJAY KUMAR.` → `G Ajay Kumar`, `Dr Srimannarayana (Review)` → `Srimannarayana`.
+(So `BALA KRISHNA SANAMPUDI (REVIEW)` is the same doctor as `BALA KRISHNA SANAMPUDI`.) Department: dots removed, title case.
+
+**Lookups (pharmacy → doctor).** OP Pharmacy and OP Returns rows with no admission number take the doctor of the OP
+consultation with the same UMRNO: the latest consultation on or before the bill date (calendar days, IST), else the nearest
+later one (`Fallback`). If the chosen day holds consultations of different doctors the row is `Ambiguous`; the tie-break prefers a
+doctor whose name does not contain "Consultation" or "Check Up", then takes the first. No consultation → `Pharmacy – Unattributed`.
+Status counts and amounts are in Checks.
+
+**DRR columns** (one rule each; `[Source]` is the source label):
+
+| Column | Rule |
+|---|---|
+| IP Count | SUM IPCount where Source = IP Discharge (1 per row) |
+| IP Revenue | SUM Amount (Gross − Concession) where Source = IP General Bill (PENDING bills included) |
+| **OP Revenue** | SUM Amount where Source = OP Billing **or** OP Consultations |
+| OP Pharmacy | SUM Amount where Source = OP Pharmacy or OP Returns (sales net of returns) |
+| OP Pharmacy Cost | SUM Cost where Source = OP Pharmacy |
+| IP Pharmacy revenue Net, Ip Pharmacy Cost | SUM IPPharmacy / IPPharmacyCost (IP Bill Breakups) |
+| Departmental Issues, Salary, Incentives, Professional Fee | from the optional Costs file; 0 without it |
+| Total Revenue | IP Revenue + OP Revenue + OP Pharmacy |
+| Gross Profit | Total Revenue − OP Pharmacy Cost − Ip Pharmacy Cost − Departmental Issues − Salary − Incentives − Professional Fee |
+
+Sponsor-wise uses the same rules by Sponsor (no cost columns); its Gross Profit is Total Revenue − OP Pharmacy Cost − Ip Pharmacy Cost.
+
+**Decisions.**
+1. **OP Revenue = OP Billing + OP Consultations**, in both reports. Each has its own tie-out (source total row vs its share of OP Revenue).
+2. **OP pharmacy sold to admitted patients** (ADMNNO / ADMISSIONNO filled) stays out of OP Pharmacy: it is billed in the IP bill.
+   The source filters stay; Checks show *Pharmacy to admitted patients excluded (billed in IP bill)* with the rows and the amount.
+3. **Unattributed pharmacy is not in the DRR.** `report.excludeRowsWhere` = `[Doctor]="Pharmacy – Unattributed"`, applied before
+   grouping (no row, no total). Checks show *Excluded from report: unattributed OP pharmacy* with the lines, sales and cost, split
+   into *no UMRNO (counter sales)* and *UMRNO with no consultation this month*. The OP Pharmacy tie-out is
+   **source total = report total + excluded total**; a mismatch is an **Error** and blocks the download. The Sponsor-wise recipe
+   excludes nothing: those rows stay under their sponsor.
+4. **Gross Profit** is unchanged. A missing Costs file is a **warning**: *Costs file not uploaded — Departmental Issues, Salary,
+   Incentives and Professional Fee are 0, so Gross Profit is before these costs.* (DRR only.)
+5. The DRR hides rows where every aggregate column is 0 (listed in Checks; the totals still count them).
+
+**October 2026 totals the golden test pins** (`tests/golden/drr.test.ts`, Month = `Oct-2026`): OP Revenue ₹31,36,235.60
+(OP Billing ₹23,64,677.60 + OP Consultations ₹7,71,558.00); IP Count 499; IP Revenue ₹3,97,19,088.00; IP Pharmacy revenue Net
+₹1,23,73,098.00; Ip Pharmacy Cost ₹55,16,177.00; OP Pharmacy ₹17,50,813.19 in Sponsor-wise and the same minus the excluded
+unattributed pharmacy in the DRR.
+
+## Default measure rules (older design — superseded by "Default DRR recipe" above)
 
 | Measure | Source | Value | Filter / notes |
 |---|---|---|---|

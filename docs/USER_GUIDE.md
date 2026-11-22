@@ -83,5 +83,8 @@ first visit also without internet.
 | *column X not found* | The export changed. Use **Fix mapping** and pick the new column. |
 | *rows could not be matched* | A lookup found no record for those rows. They are listed, with their amount. They stay in the report under the *not found* name you chose. |
 | *unreadable* values | A cell in a number or date column was not a valid number or date. It is counted as blank, and listed. |
-| *Tie-out* difference | A total at the bottom of an export does not equal the same figure in the report. Look at the filters and the sources. |
+| *Tie-out* difference | A total in an export does not equal what that file added to the report. Look at the filters and the sources. For OP Pharmacy a difference is an **error**: money is missing from the report or counted twice. |
+| *Excluded from report* | Lines the recipe leaves out of the report on purpose (for the DRR: pharmacy that could not be given a doctor). They are counted with their sales and cost, and the OP Pharmacy tie-out adds them back. |
+| *Pharmacy to admitted patients excluded* | Pharmacy lines sold to admitted patients are billed in the IP bill, so they are not in OP Pharmacy. Shown so the number is visible. |
+| *Costs file not uploaded* | The DRR has no costs this month, so Departmental Issues, Salary, Incentives and Professional Fee are 0 and Gross Profit is before these costs. |
 | *Files not used* | You added a file that no source of the recipe uses. Fine if it is not needed. |

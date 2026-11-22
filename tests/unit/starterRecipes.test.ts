@@ -5,6 +5,7 @@ import { generate } from '@/engine/generate';
 import { openWorkbook } from '@/excel/readWorkbook';
 import { bytesToBase64 } from '@/lib/base64';
 import { STARTER_IDS, starterRecipes } from '@/recipe/defaults';
+import { DEFAULT_TIE_BREAK_FORMULA } from '@/recipe/schema';
 import { checkRecipe } from '@/recipe/validate';
 import { inspectFileTask } from '@/worker/tasks/inspectFile';
 import { asFile, hisWorkbook } from '../helpers/syntheticWorkbook';
@@ -63,11 +64,16 @@ describe('starter recipes', () => {
     expect(src('opReturns').uniqueColumn).toBeUndefined();
     expect(src('opBilling').rowFilter).toBe('NOT(ISBLANK([BILLNO]))');
     expect(src('opPharmacy').rowFilter).toBe('ISBLANK([ADMNNO])');
-    expect(drr.cleanup.map((c) => [c.column, c.normalize.removeChars, c.displayCase])).toEqual([['Doctor', '.', 'title'], ['Department', '.', 'title']]);
+    // Doctor: dots become spaces, a leading "Dr" and a trailing "(REVIEW)" are stripped. Department: dots removed as before.
+    expect(drr.cleanup.map((c) => [c.column, c.normalize.removeChars, c.displayCase])).toEqual([['Doctor', '', 'title'], ['Department', '.', 'title']]);
+    expect(drr.cleanup[0]?.normalize).toMatchObject({ dotsToSpace: true, stripDrPrefix: true, stripSuffix: { enabled: true, text: ' (REVIEW)' } });
+    expect(drr.report.hideZeroRows).toBe(true);
+    expect(sponsor.report.hideZeroRows).toBeUndefined();
     expect(drr.lookups.map((l) => [l.target.source, l.pick, l.notFoundValue, l.writeStatusColumn])).toEqual([
       ['opPharmacy', 'latestOnOrBefore', 'Pharmacy – Unattributed', 'Attribution'],
       ['opReturns', 'latestOnOrBefore', 'Pharmacy – Unattributed', 'Attribution'],
     ]);
+    for (const l of drr.lookups) expect(l.tieBreak).toEqual({ method: 'preferNotMatching', preferFormula: DEFAULT_TIE_BREAK_FORMULA, then: 'first' });
     expect(sponsor.cleanup).toEqual([{ column: 'Sponsor', normalize: { trim: true, collapseSpaces: true, ignoreCase: true, removeChars: '' }, displayCase: 'asIs', aliases: [] }]);
   });
 });
@@ -85,7 +91,7 @@ function exportsFor() {
     ['IP General Bill Breakup Oct2026.xlsx', hisWorkbook('Sheet1', ['BILLNO', 'BILLDT', 'GROSSAMOUNT', 'CONCESSION', 'DOCTORNAME', 'DEPARTMENTNAME', 'BILLSTATUS', 'ORGNAME'], [['G1', '04-OCT-2026', 1000, 100, D, DEPT, 'CLEARED', SP]])],
     ['IP Bill Breakups oct2026.xlsx', hisWorkbook('Sheet1', ['BILLNO', 'BILLDT', 'DOCTORNAME', 'DEPARTMENTNAME', 'ORGANIZATIONNAME', 'PHARMACY', 'PHARPURCAMOUNT'], [['G1', '04-OCT-2026', D, DEPT, SP, 50, 30]])],
     ['OP Billing Report Oct2026.xlsx', hisWorkbook('Sheet1', ['UMRNO', 'BILLNO', 'BILLDT', 'DOCTORNAME', 'DEPARTMENTNAME', 'ORGANIZATIONNAME', 'NETAMOUNT'], [['U1', 'B1', d(4), D, DEPT, SP, 200], [null, null, null, null, null, null, 200]])],
-    ['OP Consultations Report Oct2026.xlsx', hisWorkbook('Sheet1', ['CONSULTATIONNO', 'CONSULTATIONDT', 'UMRNO', 'DOCTORNAME', 'DEPARTMENTNAME', 'Net Amount', 'ORGANIZATIONNAME'], [['C1', d(2), 'U1', D, DEPT, 100, SP]])],
+    ['OP Consultations Report Oct2026.xlsx', hisWorkbook('Sheet1', ['CONSULTATIONNO', 'CONSULTATIONDT', 'UMRNO', 'DOCTORNAME', 'DEPARTMENTNAME', 'Net Amount', 'ORGANIZATIONNAME'], [['C1', d(2), 'U1', D, DEPT, 100, SP], [null, null, null, null, null, 100, null]])],
     ['gst op pharmacy sales oct 2026.xlsx', hisWorkbook('OP pharmacy sales data', ['BILLNO', 'BILLDT', 'UMRNO', 'ADMNNO', 'ORGANIZATIONNAME', 'SALEVALUE_BEFORETAX', 'PURCHASEVALUE_BEFORE_TAX'], [['P1', d(5), 'U1', null, SP, 80, 50]])],
     ['op returns report oct 2026.xlsx', hisWorkbook('Sheet1', ['ORIGINAL_BILLNO', 'BILLDT', 'UMRNO', 'ADMISSIONNO', 'ORGANIZATIONNAME', 'SALEVALUE_BEFORETAX'], [['P1', d(6), 'U1', null, SP, 10]])],
   ] as const;
@@ -131,23 +137,24 @@ describe('starter recipes on made-up exports', () => {
     expect(result.checks.filter((c) => c.level === 'error')).toEqual([]);
     expect(result.report?.rows).toEqual([
       {
-        'S.No.': 1, 'Doctor Name': 'Dr A Kumar', Department: 'Cardiology', Month: 'Oct-2026',
-        'IP Count': 1, 'IP Revenue': 90000, 'OP Revenue': 20000, 'OP Pharmacy': 7000, 'Total Revenue': 117000,
+        'S.No.': 1, 'Doctor Name': 'A Kumar', Department: 'Cardiology', Month: 'Oct-2026',
+        'IP Count': 1, 'IP Revenue': 90000, 'OP Revenue': 30000, 'OP Pharmacy': 7000, 'Total Revenue': 127000,
         'OP Pharmacy Cost': 5000, 'IP Pharmacy revenue Net': 5000, 'Ip Pharmacy Cost': 3000,
-        'Departmental Issues Cost': 0, 'Salary Cost': 0, Incentives: 0, 'Professional Fee': 0, 'Gross Profit': 109000,
+        'Departmental Issues Cost': 0, 'Salary Cost': 0, Incentives: 0, 'Professional Fee': 0, 'Gross Profit': 119000,
       },
     ]);
-    // the OP Billing footer total (200) matches OP Revenue, and the real DRR template formulas agree with the recipe
-    expect(result.checks.find((c) => c.title === 'Tie-out: OP Billing total')?.level).toBe('info');
+    // OP Revenue = OP Billing (200) + OP Consultations (100): each footer total matches its share of the report, the pharmacy
+    // total (sales 80 - returns 10, read from the rows) matches OP Pharmacy, and the real DRR template formulas agree with the recipe
+    for (const t of ['OP Billing total', 'OP Consultations total', 'OP Pharmacy total']) expect(result.checks.find((c) => c.title === `Tie-out: ${t}`)?.level, t).toBe('info');
     expect(result.checks.filter((c) => c.title === 'Template')).toEqual([]);
     expect(result.canDownload).toBe(true);
 
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(result.workbookBytes as unknown as ArrayBuffer);
     const ws = wb.getWorksheet('Sheet1')!;
-    expect(ws.getRow(5).getCell(2).value).toBe('Dr A Kumar');
-    expect(ws.getRow(5).getCell(9).value).toMatchObject({ formula: 'F5+G5+H5', result: 1170 });
-    expect(ws.getRow(5).getCell(17).value).toMatchObject({ formula: 'I5-J5-L5-M5-N5-O5-P5', result: 1090 });
+    expect(ws.getRow(5).getCell(2).value).toBe('A Kumar'); // "Dr." is stripped by the starter recipe
+    expect(ws.getRow(5).getCell(9).value).toMatchObject({ formula: 'F5+G5+H5', result: 1270 });
+    expect(ws.getRow(5).getCell(17).value).toMatchObject({ formula: 'I5-J5-L5-M5-N5-O5-P5', result: 1190 });
   });
 
   it('Sponsor-wise: one row per sponsor and month', async () => {
@@ -159,8 +166,8 @@ describe('starter recipes on made-up exports', () => {
     expect(result.checks.filter((c) => c.level === 'error')).toEqual([]);
     expect(result.report?.rows).toEqual([
       {
-        'S.No.': 1, 'Sponsor Name': 'Star Health', Month: 'Oct-2026', 'IP Count': 1, 'IP Revenue': 90000, 'OP Revenue': 20000, 'OP Pharmacy': 7000,
-        'Total Revenue': 117000, 'OP Pharmacy Cost': 5000, 'IP Pharmacy revenue Net': 5000, 'Ip Pharmacy Cost': 3000, 'Gross Profit': 109000,
+        'S.No.': 1, 'Sponsor Name': 'Star Health', Month: 'Oct-2026', 'IP Count': 1, 'IP Revenue': 90000, 'OP Revenue': 30000, 'OP Pharmacy': 7000,
+        'Total Revenue': 127000, 'OP Pharmacy Cost': 5000, 'IP Pharmacy revenue Net': 5000, 'Ip Pharmacy Cost': 3000, 'Gross Profit': 119000,
       },
     ]);
     expect(result.checks.filter((c) => c.title === 'Template')).toEqual([]);

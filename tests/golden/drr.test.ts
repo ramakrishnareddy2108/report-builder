@@ -12,6 +12,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
+import * as XLSX from 'xlsx';
 import { assignFiles } from '@/engine/assignFiles';
 import { generate } from '@/engine/generate';
 import { formatINR } from '@/core/money';
@@ -30,10 +31,21 @@ if (!present) console.log(`[golden] ${DIR} not found: the DRR golden test is ski
 
 const TEMPLATES: Record<string, string> = {
   'starter-drr': join(DIR, 'expected', 'DRR Format.xlsx'),
-  'starter-sponsor-wise': join(DIR, 'Sponsor-wise Revenue Report.xlsx'),
+  'starter-sponsor-wise': existsSync(join(DIR, 'expected', 'Sponsor-wise Revenue Report.xlsx')) ? join(DIR, 'expected', 'Sponsor-wise Revenue Report.xlsx') : join(DIR, 'Sponsor-wise Revenue Report.xlsx'),
 };
 
-async function run(recipe: Recipe) {
+const runs = new Map<string, ReturnType<typeof runUncached>>();
+/** One run per recipe: the files are big, and the tests below only read the result. */
+function run(recipe: Recipe) {
+  let r = runs.get(recipe.id);
+  if (!r) {
+    r = runUncached(recipe);
+    runs.set(recipe.id, r);
+  }
+  return r;
+}
+
+async function runUncached(recipe: Recipe) {
   const names = readdirSync(DIR).filter((n) => n.endsWith('.xlsx') && !/sponsor-wise revenue report/i.test(n));
   const bytes = new Map(names.map((n) => [n, new Uint8Array(readFileSync(join(DIR, n)))]));
   const probes = [];
@@ -168,4 +180,111 @@ describe.skipIf(!present)('golden: October 2026 with the starter recipes', () =>
       }, 120_000);
     });
   }
+});
+
+// ---- the business rules finance confirmed (see "Default DRR recipe" in CLAUDE.md) ----------------------------------
+//
+// These ARE rule-dependent: they pin the October 2026 totals that finance confirmed. If one fails, the data or a rule
+// changed; find out which before touching the number. All amounts are integer paise.
+
+const paise = (rupees: string) => Math.round(Number(rupees.replace(/,/g, '')) * 100);
+
+describe.skipIf(!present)('golden: October 2026, the confirmed finance rules', () => {
+  const [drr, sponsor] = present ? (starterRecipes() as [Recipe, Recipe]) : ([] as unknown as [Recipe, Recipe]);
+  const money = (n: number) => formatINR(n);
+
+  it('DRR: column totals, the excluded unattributed pharmacy, and the Checks', async () => {
+    const { result } = await run(drr);
+    const report = result.report!;
+    const t = report.totals!;
+    const ex = report.excluded;
+    const exSales = ex?.amounts['OP Pharmacy'] ?? 0;
+    const exCost = ex?.amounts['OP Pharmacy Cost'] ?? 0;
+
+    const lines = ['\n[golden] DRR column totals (Month = Oct-2026)'];
+    for (const c of report.columns) if (typeof t[c.name] === 'number') lines.push(`  ${c.name.padEnd(26)} ${c.type === 'money' ? money(t[c.name] as number) : t[c.name]}`);
+    lines.push(`  OP Revenue = OP Billing ${money(Number(report.sourceShares['OP REVENUE']?.['OP BILLING']))} + OP Consultations ${money(Number(report.sourceShares['OP REVENUE']?.['OP CONSULTATIONS']))}`);
+    lines.push(`  excluded (unattributed OP pharmacy): ${ex?.rows} lines, sales ${money(exSales)}, cost ${money(exCost)}`);
+    for (const g of ex?.groups ?? []) lines.push(`    ${g.label}: ${g.rows} lines, sales ${money(g.amounts['OP Pharmacy'] ?? 0)}, cost ${money(g.amounts['OP Pharmacy Cost'] ?? 0)}`);
+    for (const l of result.lookups) {
+      const by = l.byStatus;
+      const amt = l.amountByStatus;
+      lines.push(`  lookup ${l.label}: Matched ${by.Matched} (${money(amt.Matched)}), Fallback ${by.Fallback} (${money(amt.Fallback)}), Ambiguous ${by.Ambiguous} (${money(amt.Ambiguous)}), Unattributed ${by.Unattributed} (${money(amt.Unattributed)})`);
+    }
+    lines.push('  checks:');
+    for (const c of result.checks) lines.push(`    [${c.level}] ${c.title}: ${c.message.slice(0, 260)}`);
+    console.log(lines.join('\n'));
+
+    expect(t['OP Revenue']).toBe(paise('31,36,235.60'));
+    expect(report.sourceShares['OP REVENUE']?.['OP BILLING']).toBe(paise('23,64,677.60'));
+    expect(report.sourceShares['OP REVENUE']?.['OP CONSULTATIONS']).toBe(paise('7,71,558.00'));
+    expect(t['IP Count']).toBe(499);
+    expect(t['IP Revenue']).toBe(paise('3,97,19,088.00'));
+    expect(t['IP Pharmacy revenue Net']).toBe(paise('1,23,73,098.00'));
+    expect(t['Ip Pharmacy Cost']).toBe(paise('55,16,177.00'));
+    // OP Pharmacy: 17,50,813.19 (sales net of returns) minus the unattributed lines, which are listed in the Checks instead
+    expect(t['OP Pharmacy']).toBe(paise('17,50,813.19') - exSales);
+    expect(ex?.rows).toBeGreaterThan(0);
+    expect(ex?.groups.map((g) => g.label)).toEqual(['no UMRNO (counter sales)', 'UMRNO with no consultation this month']);
+    expect(ex?.groups.reduce((n, g) => n + g.rows, 0)).toBe(ex?.rows);
+    // no report row is the unattributed doctor
+    expect(report.rows.filter((r) => /unattributed/i.test(String(r['Doctor Name'])))).toEqual([]);
+    // the report still adds up: total revenue and gross profit follow the rule of the template
+    expect(t['Total Revenue']).toBe((t['IP Revenue'] as number) + (t['OP Revenue'] as number) + (t['OP Pharmacy'] as number));
+    expect(t['Gross Profit']).toBe((t['Total Revenue'] as number) - (t['OP Pharmacy Cost'] as number) - (t['Ip Pharmacy Cost'] as number));
+
+    // the Checks
+    const byTitle = (title: string) => result.checks.find((c) => c.title === title);
+    for (const name of ['OP Billing total', 'OP Consultations total', 'OP Pharmacy total']) expect(byTitle(`Tie-out: ${name}`)?.level, name).toBe('info');
+    expect(byTitle('Excluded from report: unattributed OP pharmacy')?.message).toMatch(/lines, sales ₹.*, cost ₹/);
+    expect(byTitle('Pharmacy to admitted patients excluded (billed in IP bill)')?.rows).toBe(6018 + 133);
+    expect(result.checks.some((c) => c.level === 'warning' && /^Costs file not uploaded — /.test(c.message))).toBe(true);
+    expect(result.checks.filter((c) => c.level === 'error')).toEqual([]);
+  }, 120_000);
+
+  it('DRR spot check: Bala Krishna Sanampudi OP Revenue = billing + consultations (+ his "(REVIEW)" billing row, which the cleanup merges)', async () => {
+    const { result } = await run(drr);
+    const rows = result.report!.rows.filter((r) => String(r['Doctor Name']).toLowerCase() === 'bala krishna sanampudi');
+    const opRevenue = rows.reduce((n, r) => n + (r['OP Revenue'] as number), 0);
+
+    // The raw OP Billing file: this doctor is written two ways, the plain name (78 rows) and "... (REVIEW)" (1 row).
+    const wb = XLSX.read(readFileSync(join(DIR, readdirSync(DIR).find((n) => /^OP Billing Report/i.test(n)) as string)), { type: 'buffer' });
+    const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['Sheet1']!, { range: 2, raw: true });
+    const billing = (match: RegExp) => raw.filter((r) => match.test(String(r.DOCTORNAME ?? ''))).reduce((n, r) => n + Math.round(Number(r.NETAMOUNT ?? 0) * 100), 0);
+    const plainBilling = billing(/^\s*bala krishna sanampudi\s*$/i);
+    const reviewBilling = billing(/^\s*bala krishna sanampudi\s*\(review\)\s*$/i);
+
+    const mine = result.combined.rows.filter((r) => String(r.Doctor ?? '').toLowerCase() === 'bala krishna sanampudi');
+    const consultations = mine.filter((r) => r.Source === 'OP Consultations').reduce((n, r) => n + (typeof r.Amount === 'number' ? r.Amount : 0), 0);
+    console.log(
+      `\n[golden] Bala Krishna Sanampudi: report OP Revenue ${money(opRevenue)} = billing ${money(plainBilling)} + consultations ${money(consultations)} + billing written "(REVIEW)" ${money(reviewBilling)}`,
+    );
+
+    // finance's spot check: billing 1,73,604.50 + consultations 1,17,300.00 = 2,90,904.50
+    expect(plainBilling).toBe(paise('1,73,604.50'));
+    expect(consultations).toBe(paise('1,17,300.00'));
+    expect(plainBilling + consultations).toBe(paise('2,90,904.50'));
+    // one more OP Billing row of Rs 500 is written "BALA KRISHNA SANAMPUDI (REVIEW)". The cleanup strips " (REVIEW)" (as asked), so it
+    // is the same doctor and the report holds 2,91,404.50. If finance wants the review row kept apart, switch the suffix off in Prepare.
+    expect(reviewBilling).toBe(paise('500.00'));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(opRevenue).toBe(paise('2,90,904.50') + reviewBilling);
+  }, 120_000);
+
+  it('Sponsor-wise: nothing is excluded, so OP Pharmacy is the full 17,50,813.19', async () => {
+    const { result } = await run(sponsor);
+    const report = result.report!;
+    const t = report.totals!;
+    console.log(`\n[golden] Sponsor-wise: OP Revenue ${money(t['OP Revenue'] as number)}, OP Pharmacy ${money(t['OP Pharmacy'] as number)}, excluded rows ${report.excluded?.rows ?? 0}`);
+    expect(report.excluded).toBeNull();
+    expect(t['OP Pharmacy']).toBe(paise('17,50,813.19'));
+    expect(t['OP Revenue']).toBe(paise('31,36,235.60'));
+    expect(t['IP Count']).toBe(499);
+    // the unattributed pharmacy stays under its sponsor
+    expect(report.rows.reduce((n, r) => n + (r['OP Pharmacy'] as number), 0)).toBe(paise('17,50,813.19'));
+    for (const name of ['OP Billing total', 'OP Consultations total', 'OP Pharmacy total']) expect(result.checks.find((c) => c.title === `Tie-out: ${name}`)?.level, name).toBe('info');
+    // Sponsor-wise has no cost columns, so a missing Costs file is not a warning there
+    expect(result.checks.some((c) => /Costs file not uploaded/.test(c.message))).toBe(false);
+    expect(result.checks.filter((c) => c.level === 'error')).toEqual([]);
+  }, 120_000);
 });

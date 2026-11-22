@@ -6,7 +6,7 @@ import type { CleanupReport } from '@/engine/cleanup';
 import type { Check } from '@/engine/checks';
 import { generate } from '@/engine/generate';
 import type { LookupResult } from '@/engine/lookups';
-import { combinedWorkbookBytes } from '@/engine/output';
+import { combinedWorkbookBytes, intermediateWorkbookBytes } from '@/engine/output';
 import type { ReportResult } from '@/engine/report';
 import type { CombinedTable, ParamValues, SourceSummary } from '@/engine/types';
 import type { TemplateMappingEntry } from '@/excel/fillTemplate';
@@ -69,4 +69,16 @@ export async function exportCombinedTask(): Promise<Uint8Array> {
   const table = getLastCombined();
   if (!table) throw new Error('There is no combined data yet. Run the preview or click Generate first.');
   return combinedWorkbookBytes(table);
+}
+
+export type ExportIntermediateRequest = {
+  recipe: Pick<Recipe, 'sources' | 'lookups'>;
+  sources: SourceSummary[];
+};
+
+/** One sheet per source file, selected columns only, from the last generate run. */
+export async function exportIntermediateTask(req: ExportIntermediateRequest): Promise<Uint8Array> {
+  const table = getLastCombined();
+  if (!table) throw new Error('There is no data yet. Click Generate first.');
+  return intermediateWorkbookBytes(table, req.recipe, req.sources);
 }

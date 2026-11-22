@@ -378,7 +378,11 @@
           "type": "money"
         }
       ],
-      "rowFilter": "ISBLANK([ADMNNO])"
+      "rowFilter": "ISBLANK([ADMNNO])",
+      "leftOutNote": {
+        "title": "Pharmacy to admitted patients excluded (billed in IP bill)",
+        "amountColumn": "Amount"
+      }
     },
     {
       "required": true,
@@ -438,7 +442,11 @@
           "type": "money"
         }
       ],
-      "rowFilter": "ISBLANK([ADMISSIONNO])"
+      "rowFilter": "ISBLANK([ADMISSIONNO])",
+      "leftOutNote": {
+        "title": "Pharmacy to admitted patients excluded (billed in IP bill)",
+        "amountColumn": "Amount"
+      }
     },
     {
       "required": false,
@@ -592,7 +600,7 @@
         "name": "OP Revenue",
         "agg": "SUM",
         "of": "Amount",
-        "where": "[Source]=\"OP Billing\"",
+        "where": "OR([Source]=\"OP Billing\",[Source]=\"OP Consultations\")",
         "type": "money"
       },
       {
@@ -656,6 +664,25 @@
         "source": "opBilling",
         "column": "Amount",
         "reportColumn": "OP Revenue",
+        "tolerance": 1
+      },
+      {
+        "label": "OP Consultations total",
+        "source": "opConsultations",
+        "column": "Amount",
+        "reportColumn": "OP Revenue",
+        "tolerance": 1
+      },
+      {
+        "label": "OP Pharmacy total",
+        "source": "opPharmacy",
+        "alsoSources": [
+          "opReturns"
+        ],
+        "column": "Amount",
+        "reportColumn": "OP Pharmacy",
+        "totalFrom": "rows",
+        "level": "error",
         "tolerance": 1
       }
     ]
