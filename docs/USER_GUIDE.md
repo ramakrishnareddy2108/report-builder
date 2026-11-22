@@ -54,6 +54,22 @@ On **Home**, *New recipe* (or *Edit*). There are five steps.
    heading, and which template formulas are kept.
 5. **Test & Save.** Run it on your sample files, read the checks, then **Save**. Changes are also saved as you work.
 
+Each step starts with a short note on what to do there, and **Next** at the bottom takes you to the next step. A red dot on
+a step means something there still needs fixing.
+
+**Formulas without typing.** Every formula box has buttons under it: **+ − × ÷** and brackets, a **Function** menu that
+explains each function in plain words, and (where it helps) **Examples** built from your own columns. Below the box, the
+chips list the columns you can use *in that box*. Click them to insert. Which columns appear depends on where you are:
+
+| Formula box | Columns you can use |
+| --- | --- |
+| Sources → Keep a row when / Calculated columns | the file's own headings (and names you gave above) |
+| Report → Total → Custom condition, Leave out rows where | the combined data (Source, Doctor, Amount…) |
+| Report → Formula column | the other columns of the report |
+
+A **Total** card also says in words what it does, for example *Adds up Amount from OP Billing and OP Consultations, for
+each line of the report*.
+
 The recipe is not finished until the list at the top of *Test & Save* is empty. A recipe that is not finished says so on Home.
 
 ## Dashboards

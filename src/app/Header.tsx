@@ -1,5 +1,6 @@
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BrandMark } from './BrandMark';
 import { usePwa } from './pwa';
 import { UnsavedBadge } from './UnsavedBadge';
 
@@ -8,9 +9,12 @@ export function Header() {
   const install = usePwa((s) => s.install);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:px-6">
-      <span className="text-base font-semibold md:hidden">Report Builder</span>
-      <span className="hidden text-sm text-muted-foreground md:inline">Excel exports in, finished report out.</span>
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-background/80 px-4 backdrop-blur md:px-6">
+      <span className="flex items-center gap-2 text-base font-semibold md:hidden">
+        <BrandMark className="size-8" />
+        Report Builder
+      </span>
+      <span className="hidden text-sm text-muted-foreground md:inline">HIS exports in. Checked, tied-out reports out.</span>
       <div className="flex items-center gap-2">
         <UnsavedBadge />
         {canInstall && (

@@ -92,19 +92,34 @@ export function ReportTab() {
         {report.columns.map((_, i) => (
           <ReportColumnCard key={i} index={i} total={report.columns.length} />
         ))}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => add({ kind: 'serial', name: 'S.No.' })}>
-            <Hash className="size-4" /> Row number
-          </Button>
-          <Button variant="outline" size="sm" disabled={report.groupBy.length === 0} onClick={() => add({ kind: 'group', name: unshownGroup ?? report.groupBy[0] ?? '', from: unshownGroup ?? report.groupBy[0] ?? '' })}>
-            <Users className="size-4" /> Group name
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => add({ kind: 'aggregate', name: 'New total', agg: 'SUM', of: firstMoney?.name, type: aggregateType('SUM', firstMoney?.type) })}>
-            <Sigma className="size-4" /> Total
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => add({ kind: 'formula', name: 'New formula', formula: '', type: 'money' })}>
-            <Sparkles className="size-4" /> Formula
-          </Button>
+        <div>
+          <p className="mb-2 text-sm font-medium">Add a column</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {(
+              [
+                { icon: Sigma, title: 'Total', text: 'Add up or count a column, like SUMIF', tone: 'text-emerald-600 dark:text-emerald-400', disabled: false, onClick: () => add({ kind: 'aggregate', name: 'New total', agg: 'SUM', of: firstMoney?.name, type: aggregateType('SUM', firstMoney?.type) }) },
+                { icon: Sparkles, title: 'Formula', text: 'Calculate from other columns, e.g. A + B', tone: 'text-violet-600 dark:text-violet-400', disabled: false, onClick: () => add({ kind: 'formula', name: 'New formula', formula: '', type: 'money' }) },
+                { icon: Users, title: 'Name', text: 'Show the doctor, sponsor, month…', tone: 'text-sky-600 dark:text-sky-400', disabled: report.groupBy.length === 0, onClick: () => add({ kind: 'group', name: unshownGroup ?? report.groupBy[0] ?? '', from: unshownGroup ?? report.groupBy[0] ?? '' }) },
+                { icon: Hash, title: 'Row number', text: 'S.No. 1, 2, 3…', tone: 'text-muted-foreground', disabled: false, onClick: () => add({ kind: 'serial', name: 'S.No.' }) },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.title}
+                type="button"
+                disabled={t.disabled}
+                onClick={t.onClick}
+                className="flex items-start gap-3 rounded-xl border border-dashed bg-card p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50"
+              >
+                <t.icon className={`mt-0.5 size-5 shrink-0 ${t.tone}`} aria-hidden />
+                <span>
+                  <span className="flex items-center gap-1 text-sm font-semibold">
+                    <Plus className="size-3.5" aria-hidden /> {t.title}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">{t.text}</span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -163,6 +178,7 @@ export function ReportTab() {
           value={report.excludeRowsWhere ?? ''}
           onChange={(v) => update((r) => void (r.report.excludeRowsWhere = v.trim() === '' ? undefined : v))}
           columns={all.map((c) => c.name).filter((n) => !n.startsWith('_'))}
+          columnsLabel="Columns of the combined data"
           columnExists={(n) => all.some((c) => c.name.toUpperCase() === n.toUpperCase())}
           placeholder={'[Doctor]="Pharmacy – Unattributed"'}
           hint="A formula on the combined rows, applied before the rows are grouped. Rows it is TRUE for are not in the report or its totals. They are counted, with their amounts, in Checks."

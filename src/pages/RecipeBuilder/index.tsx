@@ -1,5 +1,7 @@
-import { ArrowLeft, Check, CircleAlert, FileSpreadsheet, Loader2, Play } from 'lucide-react';
-import { useEffect } from 'react';
+import { ArrowLeft, ArrowRight, Calculator, Check, CircleAlert, FileSpreadsheet, LayoutTemplate, Loader2, Play, ShieldCheck, Wand2, type LucideIcon } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { cn } from '@/lib/utils';
+import { checkRecipe } from '@/recipe/validate';
 import { toast } from 'sonner';
 import { useHandoff } from '@/app/handoff';
 import { useLibrary } from '@/app/libraryStore';
@@ -18,13 +20,93 @@ import { ReportTab } from './ReportTab';
 import { TestTab } from './TestTab';
 import { SourcesTab } from './SourcesTab';
 
-const TABS = [
-  { id: 'sources', label: '1 Sources' },
-  { id: 'prepare', label: '2 Prepare' },
-  { id: 'report', label: '3 Report' },
-  { id: 'output', label: '4 Output' },
-  { id: 'test', label: '5 Test & Save' },
-] as const;
+type StepId = 'sources' | 'prepare' | 'report' | 'output' | 'test';
+
+/** The five steps, each with a plain-language subtitle and a short "what you do here". */
+const STEPS: readonly { id: StepId; label: string; sub: string; icon: LucideIcon; intro: React.ReactNode }[] = [
+  {
+    id: 'sources',
+    label: 'Sources',
+    sub: 'Your Excel files',
+    icon: FileSpreadsheet,
+    intro: (
+      <>
+        Add last month’s exports as samples. For each file, tick the columns the report needs and give each a <b>common name</b>.
+        For example, <code>ORGNAME</code> in one file and <code>ORGANIZATIONNAME</code> in another both become <b>Sponsor</b>, so
+        all files line up like one ledger.
+      </>
+    ),
+  },
+  {
+    id: 'prepare',
+    label: 'Prepare',
+    sub: 'Tidy names · optional',
+    icon: Wand2,
+    intro: (
+      <>
+        <b>Optional.</b> Merge different spellings of the same name (“DR. K.KRISHNA”, “k krishna”) so their figures add up, and
+        fill gaps such as the doctor on a pharmacy bill. If the names already look right, skip to <b>Report</b>.
+      </>
+    ),
+  },
+  {
+    id: 'report',
+    label: 'Report',
+    sub: 'Rows, totals, formulas',
+    icon: Calculator,
+    intro: (
+      <>
+        Decide what one line of the report is (for example one per doctor per month). Then add columns: a <b>Total</b> adds up a
+        column from the files you tick, like Excel’s SUMIF. A <b>Formula</b> works across report columns, like
+        Total Revenue = IP Revenue + OP Revenue + OP Pharmacy.
+      </>
+    ),
+  },
+  {
+    id: 'output',
+    label: 'Output',
+    sub: 'Excel layout',
+    icon: LayoutTemplate,
+    intro: <>Choose a plain Excel sheet, or upload your own format. The app fills it in and keeps its formulas and styling.</>,
+  },
+  {
+    id: 'test',
+    label: 'Test & Save',
+    sub: 'Try it on the samples',
+    icon: ShieldCheck,
+    intro: <>Run everything on the sample files and read the checks. Fix anything red. When nothing is left to fix, the recipe is ready for every month.</>,
+  },
+];
+
+function StepIntro({ step }: { step: (typeof STEPS)[number] }) {
+  return (
+    <div className="flex gap-3 rounded-xl border border-primary/15 bg-accent/60 p-4 text-sm leading-relaxed">
+      <step.icon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+      <p className="[&_code]:rounded [&_code]:bg-background [&_code]:px-1 [&_code]:text-xs">{step.intro}</p>
+    </div>
+  );
+}
+
+function StepNav({ index, onGo }: { index: number; onGo: (id: StepId) => void }) {
+  const prev = STEPS[index - 1];
+  const next = STEPS[index + 1];
+  return (
+    <div className="mt-10 flex items-center justify-between gap-3 border-t pt-4">
+      {prev ? (
+        <Button variant="ghost" onClick={() => onGo(prev.id)}>
+          <ArrowLeft className="size-4" /> {prev.label}
+        </Button>
+      ) : (
+        <span />
+      )}
+      {next && (
+        <Button onClick={() => onGo(next.id)}>
+          Next: {next.label} <ArrowRight className="size-4" />
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function SaveIndicator() {
   const saveState = useBuilder((s) => s.saveState);
@@ -89,6 +171,14 @@ export function RecipeBuilderPage() {
   useEffect(() => () => useBuilder.getState().close(), []);
   useUnsavedWarning(saveState === 'saving' || saveState === 'invalid');
 
+  // Problems per step, for the red dots on the stepper.
+  const problems = useMemo(() => (recipe ? checkRecipe(recipe) : []), [recipe]);
+  const stepIndex = Math.max(0, STEPS.findIndex((s) => s.id === tab));
+  const goStep = (id: string) => {
+    setTab(id);
+    document.getElementById('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (!recipeId) {
     return (
       <EmptyState icon={FileSpreadsheet} title="Open a recipe from Home" description="Choose New recipe or Edit on the Home page to start building." action={<Button onClick={() => go({ page: 'home' })}>Go to Home</Button>} />
@@ -135,29 +225,50 @@ export function RecipeBuilderPage() {
         </details>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="gap-4">
-        <TabsList className="h-auto w-full justify-start overflow-x-auto" aria-label="Recipe steps">
-          {TABS.map((t) => (
-            <TabsTrigger key={t.id} value={t.id} className="min-h-10 shrink-0 px-3">
-              {t.label}
-            </TabsTrigger>
-          ))}
+      <Tabs value={tab} onValueChange={goStep} className="gap-5">
+        <TabsList
+          className="sticky -top-4 z-10 -mx-4 md:-top-6 grid h-auto! w-[calc(100%+2rem)] grid-cols-5 gap-1 rounded-none border-b bg-background/90! px-4 py-2 backdrop-blur md:mx-0 md:w-full md:rounded-xl md:border md:p-1.5"
+          aria-label="Recipe steps"
+        >
+          {STEPS.map((s, i) => {
+            const errors = problems.filter((p) => p.level === 'error' && p.tab === s.id).length;
+            const done = i < stepIndex;
+            return (
+              <TabsTrigger
+                key={s.id}
+                value={s.id}
+                className="h-auto min-h-12 flex-col items-center gap-1 rounded-lg px-1 py-2 whitespace-normal after:hidden data-active:bg-accent! data-active:text-foreground data-active:shadow-none! sm:flex-row sm:justify-start sm:gap-2.5 sm:px-2.5 sm:text-left"
+              >
+                <span
+                  className={cn(
+                    'relative flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors',
+                    i === stepIndex ? 'border-primary bg-primary text-primary-foreground' : done ? 'border-primary/40 bg-primary/10 text-primary' : 'bg-background text-muted-foreground',
+                  )}
+                >
+                  {done && errors === 0 ? <Check className="size-3.5" aria-hidden /> : i + 1}
+                  {errors > 0 && (
+                    <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-destructive ring-2 ring-background" aria-label={`${errors} to fix`} />
+                  )}
+                </span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block text-xs font-semibold sm:text-sm">{s.label}</span>
+                  <span className="hidden truncate text-xs font-normal text-muted-foreground lg:block">{s.sub}</span>
+                </span>
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
-        <TabsContent value="sources" className="pt-2">
-          <SourcesTab />
-        </TabsContent>
-        <TabsContent value="prepare" className="pt-2">
-          <PrepareTab />
-        </TabsContent>
-        <TabsContent value="report" className="pt-2">
-          <ReportTab />
-        </TabsContent>
-        <TabsContent value="output" className="pt-2">
-          <OutputTab />
-        </TabsContent>
-        <TabsContent value="test" className="pt-2">
-          <TestTab />
-        </TabsContent>
+        {STEPS.map((s, i) => (
+          <TabsContent key={s.id} value={s.id} className="rise-in space-y-6 pt-1">
+            <StepIntro step={s} />
+            {s.id === 'sources' && <SourcesTab />}
+            {s.id === 'prepare' && <PrepareTab />}
+            {s.id === 'report' && <ReportTab />}
+            {s.id === 'output' && <OutputTab />}
+            {s.id === 'test' && <TestTab />}
+            <StepNav index={i} onGo={goStep} />
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { FileDrop } from '@/components/FileDrop';
-import { FormulaField } from '@/components/FormulaField';
+import { FormulaField, type FormulaExample } from '@/components/FormulaField';
 import { NativeSelect } from '@/components/NativeSelect';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,27 @@ const TYPES: { value: ColumnType; label: string }[] = [
   { value: 'date', label: 'Date' },
 ];
 
-const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+/** Ready-made row filters, using this file's own first column so they work as they are. */
+function filterExamples(headers: readonly string[]): FormulaExample[] {
+  const first = headers[0];
+  if (!first) return [];
+  return [
+    { label: `Drop the totals row (keep rows where ${first} is filled)`, formula: `NOT(ISBLANK([${first}]))` },
+    { label: `Keep only rows where ${first} is empty`, formula: `ISBLANK([${first}])` },
+    { label: 'Keep one value only (edit the column and text)', formula: `[${first}]="VALUE"` },
+  ];
+}
+
+/** Ready-made calculated columns from the money / number columns picked. */
+function calcExamples(numeric: readonly string[]): FormulaExample[] {
+  const [a, b] = numeric;
+  if (!a) return [{ label: 'Count 1 for every row', formula: '1' }];
+  const out: FormulaExample[] = [{ label: 'Count 1 for every row', formula: '1' }, { label: `Make ${a} negative (e.g. returns)`, formula: `-[${a}]` }];
+  if (b) out.unshift({ label: `${a} minus ${b} (e.g. gross − concession)`, formula: `[${a}]-[${b}]` }, { label: `${a} plus ${b}`, formula: `[${a}]+[${b}]` });
+  return out;
+}
+
+const sameList =(a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 function Section({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
   return (
@@ -213,8 +233,10 @@ export function SourceCard({ sourceId, startOpen = false }: { sourceId: string; 
                 value={source.rowFilter ?? ''}
                 onChange={(v) => edit((s) => (s.rowFilter = v === '' ? undefined : v))}
                 columns={originals}
+                columnsLabel="Columns in this file"
                 columnExists={index ? originalExists : undefined}
                 placeholder="NOT(ISBLANK([BILLNO]))"
+                examples={filterExamples(originals)}
                 optional
                 hint={sample ? 'Leave empty to keep every row.' : 'Add a sample file to check the column names.'}
               />
@@ -244,8 +266,10 @@ export function SourceCard({ sourceId, startOpen = false }: { sourceId: string; 
                         value={c.formula}
                         onChange={(v) => edit((s) => ((s.calculated[i] as SourceDef['calculated'][number]).formula = v))}
                         columns={[...new Set([...renamed.filter((n) => earlier.has(n.toUpperCase())), ...originals])]}
+                        columnsLabel="Columns in this file, and names you gave above"
                         columnExists={index ? (n) => earlier.has(n.toUpperCase()) || originalExists(n) : (n) => earlier.has(n.toUpperCase())}
                         placeholder="[GROSSAMOUNT]-[CONCESSION]"
+                        examples={calcExamples(source.columns.filter((x) => x.type === 'money' || x.type === 'number').map((x) => x.as))}
                       />
                     </div>
                   );

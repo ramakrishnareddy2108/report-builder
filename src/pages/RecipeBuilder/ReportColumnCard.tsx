@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
-import { FormulaField } from '@/components/FormulaField';
+import { FormulaField, type FormulaExample } from '@/components/FormulaField';
 import { NativeSelect } from '@/components/NativeSelect';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,13 +20,32 @@ const AGGS: { value: AggregateFn; label: string }[] = [
   { value: 'MIN', label: 'Smallest' },
   { value: 'MAX', label: 'Largest' },
 ];
-const KIND_LABEL: Record<ReportColumn['kind'], string> = { group: 'Group', aggregate: 'Total', formula: 'Formula', serial: 'Number' };
+const KIND_LABEL: Record<ReportColumn['kind'], string> = { group: 'Name', aggregate: 'Total', formula: 'Formula', serial: 'S.No.' };
+const KIND_STYLE: Record<ReportColumn['kind'], string> = {
+  group: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
+  aggregate: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
+  formula: 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300',
+  serial: 'bg-muted text-muted-foreground',
+};
 const TYPES: { value: ColumnType; label: string }[] = [
   { value: 'money', label: 'Money (₹)' },
   { value: 'number', label: 'Number' },
   { value: 'text', label: 'Text' },
   { value: 'date', label: 'Date' },
 ];
+
+/** Ready-made report formulas from the number columns already in the report. */
+function formulaExamples(numeric: readonly string[]): FormulaExample[] {
+  const [a, b, c] = numeric;
+  if (!a || !b) return [];
+  const out: FormulaExample[] = [
+    { label: `Add: ${a} + ${b}`, formula: `[${a}]+[${b}]` },
+    { label: `Subtract: ${a} − ${b}`, formula: `[${a}]-[${b}]` },
+    { label: `Percentage: ${b} as % of ${a}`, formula: `IFERROR(ROUND([${b}]/[${a}]*100,2),0)` },
+  ];
+  if (c) out.splice(1, 0, { label: `Add three: ${a} + ${b} + ${c}`, formula: `[${a}]+[${b}]+[${c}]` });
+  return out;
+}
 
 /** The type a total should have: counts are numbers, the rest follow the column they work on. */
 export function aggregateType(agg: AggregateFn, ofType: ColumnType | undefined): ColumnType {
@@ -52,9 +71,9 @@ export function ReportColumnCard({ index, total }: { index: number; total: numbe
   const others = recipe.report.columns.filter((_, i) => i !== index).map((c) => c.name).filter((n) => n.trim() !== '');
 
   return (
-    <div className="space-y-3 rounded-lg border p-3">
+    <div className="space-y-3 rounded-xl border bg-card p-3 shadow-xs">
       <div className="flex items-center gap-2">
-        <Badge variant="secondary" className="shrink-0">
+        <Badge variant="secondary" className={`w-16 shrink-0 justify-center ${KIND_STYLE[col.kind]}`}>
           {KIND_LABEL[col.kind]}
         </Badge>
         <Input value={col.name} onChange={(e) => patch((c) => (c.name = e.target.value))} aria-label="Column heading" placeholder="Heading in the report" aria-invalid={col.name.trim() === ''} />
@@ -89,12 +108,15 @@ export function ReportColumnCard({ index, total }: { index: number; total: numbe
       {col.kind === 'formula' && (
         <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
           <FormulaField
-            label="Formula (uses other columns of this report)"
+            label="Calculate this column as"
             value={col.formula}
             onChange={(v) => patch((c) => ((c as Formula).formula = v))}
             columns={others}
+            columnsLabel="Other columns of this report"
             columnExists={(n) => others.some((o) => o.toUpperCase() === n.toUpperCase())}
             placeholder="[IP Revenue]+[OP Revenue]"
+            hint="Works on each report line, like a formula across one row in Excel."
+            examples={formulaExamples(recipe.report.columns.filter((c, i) => i !== index && (c.kind === 'aggregate' || c.kind === 'formula') && (c.type === 'money' || c.type === 'number')).map((c) => c.name))}
           />
           <label className="space-y-1 text-sm">
             <span className="font-medium">Type</span>
@@ -121,8 +143,18 @@ function AggregateEditor({ col, recipe, patch, all }: { col: Agg; recipe: Recipe
   const selected = parseSourceFilter(col.where);
   const needsOf = col.agg !== 'COUNT';
 
+  const verb = { SUM: 'Adds up', COUNT: 'Counts the rows', COUNTDISTINCT: 'Counts the different values of', AVG: 'Averages', MIN: 'Takes the smallest', MAX: 'Takes the largest' }[col.agg];
+  const what = col.agg === 'COUNT' ? '' : ` ${col.of ?? '…'}`;
+  const fromText =
+    selected === null ? 'from the rows that meet the custom condition' : selected.length === 0 ? 'from every file' : `from ${selected.join(selected.length === 2 ? ' and ' : ', ')}`;
+
   return (
     <div className="space-y-3">
+      <p className="rounded-lg bg-muted/60 px-3 py-2 text-sm">
+        <span className="text-muted-foreground">In words: </span>
+        {verb}
+        <b>{what}</b> {fromText}, for each line of the report.
+      </p>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="space-y-1 text-sm">
           <span className="font-medium">Calculation</span>
@@ -205,6 +237,7 @@ function AggregateEditor({ col, recipe, patch, all }: { col: Agg; recipe: Recipe
             value={col.where ?? ''}
             onChange={(v) => patch((c) => (c.where = v === '' ? undefined : v))}
             columns={all.map((c) => c.name)}
+            columnsLabel="Columns of the combined data"
             columnExists={(n) => all.some((c) => c.name.toUpperCase() === n.toUpperCase())}
             placeholder={'[Source]="OP Billing"'}
             hint="Leave empty to count every row of the group."
